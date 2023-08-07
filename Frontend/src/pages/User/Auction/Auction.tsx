@@ -13,7 +13,7 @@ import AuctionUserItem from '../../../components/AuctionUserItem'
 import FilterUserAuction from './FilterUserAuction'
 import { VerifyCollection } from "../../../services/contracts/raffle";
 
-const { Backend_URL, AUCTION } = CONFIG;
+const { Backend_URL, AUCTION, DECIMAL } = CONFIG;
 
 const UserAuction = () => {
   const [isLoading, setLoading] = useState(false);
@@ -29,6 +29,8 @@ const UserAuction = () => {
   const [isPastAuction, setPastAuction] = useState(false);
   const [isFilterAuction, setFilterAuction] = useState(false);
   const [ownNfts, setOwnNfts] = useState([])
+  const currentTime = Math.floor(Date.now() / 1000);
+  const [menuIndex, setMenuIndex] = useState(0)
 
   const [filterData, setFilterData] = useState<any>({
     tokenId: ``,
@@ -59,11 +61,17 @@ const UserAuction = () => {
     setFilterAuction(false);
   };
   const handleFilterAuction = () => {
-    setFeatured(false)
-    setAllAuction(false);
-    setPastAuction(false);
-    setFilterAuction(true);
+    // setFeatured(false)
+    // setAllAuction(false);
+    // setPastAuction(false);
+    setFilterAuction(!isFilterAuction);
   };
+
+  const handleKeyPress = (e: any) => {
+    if(e.key === 'Enter') {
+      handleFilterApplyBtn()
+    }
+  }
 
   const handleSearchNft = (input: any) => {
     setSearchNft(input)
@@ -72,23 +80,49 @@ const UserAuction = () => {
     setFilterByItem(filtered_name)
   }
 
-  const handleExpiringSoonSort = () => {
-    const res = auctionData.sort((a: any, b: any) => a.end_date - b.end_date)
+  const handleRecentlyAdded = () => {
+    const res = auctionData.sort((a: any, b: any) => b?.id - a?.id)
     setFilterByItem([...res])
+    setMenuIndex(0)
   }
 
-  const handleSellingOutSoonSort = () => {
-    const res = auctionData.sort((a: any, b: any) => a.count - b.count)
+  const handleExpiringSoonSort = () => {
+    // isFilterByItem
+    const res = auctionData.sort((a: any, b: any) => a.end_date - b.end_date).filter((item: any) => currentTime > item.start_date && currentTime < item.end_date)
     setFilterByItem([...res])
+    setMenuIndex(1)
+  }
+
+  
+  const handleSellingOutSoonSort = () => {
+    // isFilterByItem
+    const res = auctionData.sort((a: any, b: any) => a.count - b.count).filter((item: any) => currentTime > item.start_date && currentTime < item.end_date)
+    setFilterByItem([...res])
+    setMenuIndex(2)
   }
 
   const handlePriceAscendingSort = () => {
-    const res = isFilterByItem.sort((a: any, b: any) => a.min_bid_amount - b.min_bid_amount)
+    const res = auctionData.sort((a: any, b: any) => a.price - b.price)
     setFilterByItem([...res])
+    setMenuIndex(3)
   }
+
   const handlePriceDescendingSort = () => {
-    const res = isFilterByItem.sort((a: any, b: any) => b.min_bid_amount - a.min_bid_amount)
+    const res = auctionData.sort((a: any, b: any) => b.price - a.price)
     setFilterByItem([...res])
+    setMenuIndex(4)
+  }
+
+  const handleFloorAscendingSort = () => {
+    const res = auctionData.sort((a: any, b: any) => a.floor_price - b.floor_price)
+    setFilterByItem([...res])
+    setMenuIndex(5)
+  }
+
+  const handleFloorDescendingSort = () => {
+    const res = auctionData.sort((a: any, b: any) => b.floor_price - a.floor_price)
+    setFilterByItem([...res])
+    setMenuIndex(6)
   }
 
   const handleFilterApplyBtn = () => {
@@ -135,6 +169,7 @@ const UserAuction = () => {
       let final_auction_All: any[] = []
       for (let i = 0; i < getAuction.length; i++) {
         const auctionId = new anchor.BN(getAuction[i].id);
+      
         const [pool] = await PublicKey.findProgramAddress(
           [
             Buffer.from(AUCTION.POOL_SEED),
@@ -144,13 +179,34 @@ const UserAuction = () => {
           program.programId
         );
         const exist_pool = await connection.getAccountInfo(pool);
-
         if (exist_pool) {
+          console.log('pool', pool.toString())
           const poolData: any = await program.account.pool.fetch(pool);
+         
+          let bids = [] 
+          bids = poolData?.bids
+
+          let winner_buyerLists = [];
+          for (let i = 0; i < bids.length; i++) {
+            winner_buyerLists.push(bids[i].price.toNumber())
+          }
+          let high = 0;
+          if(winner_buyerLists.length > 0)
+            high = Math.max.apply(Math, winner_buyerLists);
+          
+
+          const result: any = bids.find((item: any) => item.isWinner === 1)
+          console.log('result', bids)
+          let winnerWalletAddress = ''
+          if(result)
+            winnerWalletAddress = result?.bidder?.toString()
 
           const res = {
             ...getAuction[i],
-            count: poolData.count
+            count: poolData.count,
+            winnerWalletAddress,
+            endTime: poolData.endTime,
+            topBidAmount: high / DECIMAL
           };
           final_auction_All.push(res)
         } else {
@@ -158,8 +214,8 @@ const UserAuction = () => {
         }
       }
 
-      setFilterByItem([...final_auction_All])
-      setAuctionData([...final_auction_All]);
+      setFilterByItem([...final_auction_All].sort((a: any, b: any) => b?.id - a?.id))
+      setAuctionData([...final_auction_All].sort((a: any, b: any) => b?.id - a?.id));
 
       const featuredData = final_auction_All.filter(
         (item: any) => item.end_date >= Date.now() / 1000 && Date.now() / 1000 >= item.start_date
@@ -168,8 +224,8 @@ const UserAuction = () => {
         (item: any) => item.end_date < Date.now() / 1000
       );
 
-      setFeaturedData(featuredData);
-      setPastData(pastData);
+      setFeaturedData(featuredData.sort((a: any, b: any) => b?.id - a?.id));
+      setPastData(pastData.sort((a: any, b: any) => b?.id - a?.id));
 
     } catch (error) {
       console.log('error', error)
@@ -230,6 +286,20 @@ const UserAuction = () => {
             </svg>
             <span className="inline-block ml-2 text-base">Filter</span>
           </button>
+          <div className="relative">
+              <input
+                type="text"
+                placeholder="Search"
+                className=" text-[#fff] placeholder:text-[#9B9B9B] bg-[#46464680] text-base p-3 rounded-[0.6rem] border border-[#606060] outline-none text-[#9B9B9B]"
+                value={searchNft}
+                onChange={(e) => handleSearchNft(e.target.value)}
+              />
+              <img
+                src={searchIcon}
+                alt="searchIcon"
+                className="absolute top-[12px] right-[10px] w-[26px]"
+              />
+            </div>
           <div className="flex items-center justify-between">
             <button
               type="button"
@@ -262,24 +332,6 @@ const UserAuction = () => {
               Past Auctions
             </button>
           </div>
-          {
-            isFilterAuction && <div className="relative">
-              <input
-                type="text"
-                placeholder="Search"
-                className=" text-[#fff] placeholder:text-[#9B9B9B] bg-[#46464680] text-base p-3 rounded-[0.6rem] border border-[#606060] outline-none text-[#9B9B9B]"
-                value={searchNft}
-                onChange={(e) => handleSearchNft(e.target.value)}
-              />
-              <img
-                src={searchIcon}
-                alt="searchIcon"
-                className="absolute top-[12px] right-[10px] w-[26px]"
-              />
-            </div>
-          }
-
-
         </div>
         {/* Filter Auction Tab  */}
         {isFilterAuction && (
@@ -295,12 +347,19 @@ const UserAuction = () => {
                     <div className="basis-[22%]">
                       <div className="border-4 border-[#606060] bg-white p-4 mt-6 rounded-[0.6rem]">
                         <h1 className="text-3xl">Sort</h1>
-                        <p className="text-lg ml-1">Recently Added</p>
                         <ul className="ml-1">
+                        <li className="my-2">
+                            <p
+                              onClick={handleRecentlyAdded}
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 0 && "font-bold"}`}
+                            >
+                              Recently Added
+                            </p>
+                          </li>
                           <li className="my-2">
                             <p
                               onClick={handleExpiringSoonSort}
-                              className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 1 && "font-bold"}`}
                             >
                               Expiring Soon
                             </p>
@@ -308,7 +367,7 @@ const UserAuction = () => {
                           <li className="my-2">
                             <p
                               onClick={handleSellingOutSoonSort}
-                              className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 2 && "font-bold"}`}
                             >
                               Selling Out Soon
                             </p>
@@ -316,29 +375,31 @@ const UserAuction = () => {
                           <li className="my-2">
                             <p
                               onClick={handlePriceAscendingSort}
-                              className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 3 && "font-bold"}`}
                             >
-                              Price (Ascending)
+                              Ticket Price (Ascending)
                             </p>
                           </li>
                           <li className="my-2">
                             <p
                               onClick={handlePriceDescendingSort}
-                              className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 4 && "font-bold"}`}
                             >
-                              Price (Descending)
+                              Ticket Price (Descending)
                             </p>
                           </li>
                           <li className="my-2">
                             <p
-                              className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
+                              onClick={handleFloorAscendingSort}
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 5 && "font-bold"}`}
                             >
                               Floor (Ascending)
                             </p>
                           </li>
                           <li className="my-2">
                             <p
-                              className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
+                              onClick={handleFloorDescendingSort}
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 6 && "font-bold"}`}
                             >
                               Floor (Descending)
                             </p>
@@ -357,6 +418,7 @@ const UserAuction = () => {
                                 className="bg-[#46464680] w-full text-[#000] placeholder:text-[#606060] p-3 outline-none"
                                 value={filterData.tokenId}
                                 onChange={(e) => setFilterData({ ...filterData, tokenId: e.target.value })}
+                                onKeyPress={(e) => handleKeyPress(e)}
                               />
                             </div>
                           </div>
@@ -371,6 +433,7 @@ const UserAuction = () => {
                                 className="bg-[#46464680] w-full text-[#000] placeholder:text-[#606060] p-3 outline-none"
                                 value={filterData.name}
                                 onChange={(e) => setFilterData({ ...filterData, name: e.target.value })}
+                                onKeyPress={(e) => handleKeyPress(e)}
                               />
                             </div>
                           </div>
@@ -384,6 +447,7 @@ const UserAuction = () => {
                                   name="collection"
                                   placeholder="Minimum"
                                   className="bg-[#46464680] w-full text-[#000] placeholder:text-[#606060] p-3 outline-none"
+                                  onKeyPress={(e) => handleKeyPress(e)}
                                 />
                               </div>
                               <div className="basis-[48%] relative border border-[#606060] rounded-[0.5rem] overflow-hidden">
@@ -393,6 +457,7 @@ const UserAuction = () => {
                                   name="collection"
                                   placeholder="Maximum"
                                   className="bg-[#46464680] w-full text-[#606060] placeholder:text-[#606060] p-3 outline-none"
+                                  onKeyPress={(e) => handleKeyPress(e)}
                                 />
                               </div>
                             </div>
@@ -408,6 +473,7 @@ const UserAuction = () => {
                                 className="bg-[#46464680] w-full text-[#000] placeholder:text-[#606060] p-3 outline-none"
                                 value={datetimeLocal(filterData.endDate)}
                                 onChange={(e) => setFilterData({ ...filterData, endDate: new Date(e.target.value) })}
+                                onKeyPress={(e) => handleKeyPress(e)}
                               />
                             </div>
                           </div>

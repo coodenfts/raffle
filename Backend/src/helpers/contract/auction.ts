@@ -17,10 +17,15 @@ import {
 import CONFIG from '../../config'
 import NodeWallet from '@project-serum/anchor/dist/cjs/nodewallet';
 
+import { makeTransaction } from '../../helper/composables/sol/connection';
+import createAssociatedTokenAccountInstruction from '../../helper/composables';
+
+
 const {
   ADMIN_WALLET_PUB,
   WINNER_WALLET,
-  CLUSTER_API
+  CLUSTER_API,
+  TOKEN_ADDRESS,
 } = CONFIG;
 
 const { IDL, PROGRAM_ID, POOL_SEED, PAY_TOKEN_DECIMAL } = CONFIG.AUCTION;
@@ -242,6 +247,97 @@ export const sendBackNftForAuction = async (
   catch (error) {
     console.log('error', error);
     return false;
+  }
+
+  return false;
+};
+
+export const sendBackFTforAuction = async (
+  auctionId: number,
+  mint: string,
+  otherBids: any[]
+) => {
+  try {
+    let instructions: any = [], signers: any = [];
+    
+    for(let i = 0; i < otherBids.length; i++) { 
+      const id = new anchor.BN(auctionId)
+      const [pool] = await PublicKey.findProgramAddress([
+        Buffer.from(POOL_SEED),
+        id.toArrayLike(Buffer, 'le', 8),
+        new PublicKey(mint).toBuffer()
+      ], new PublicKey(PROGRAM_ID))
+  
+      let ataFrom = await getAssociatedTokenAddress(new PublicKey(TOKEN_ADDRESS), pool, true);
+      let ataTo = await getAssociatedTokenAddress(new PublicKey(TOKEN_ADDRESS), otherBids[i].bidder)
+
+      const ataToInfo = await connection.getAccountInfo(ataTo);
+      if (!ataToInfo) {
+        instructions.push(createAssociatedTokenAccountInstruction(ADMIN_WALLET.publicKey, ataTo, otherBids[i].bidder, new PublicKey(CONFIG.TOKEN_ADDRESS)))
+      }
+
+      instructions.push(program.instruction.sendBackFt({
+        accounts: {
+          partner: ADMIN_WALLET.publicKey,
+          bidder: otherBids[i].bidder,
+          pool: pool,
+          payMint: TOKEN_ADDRESS,
+          ataFrom: ataFrom,
+          ataTo: ataTo,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+          rent: SYSVAR_RENT_PUBKEY
+        }
+      }))
+    }
+    
+    const transaction = await makeTransaction(connection, instructions, signers, ADMIN_WALLET.publicKey)
+  
+    return transaction
+
+  }
+  catch (error) {
+    console.log('error', error)
+    return null;
+  }
+}
+
+export const setWinnerForAuction = async (
+  auctionId: number,
+  mint: PublicKey
+): Promise<Boolean> => {
+
+  try {
+    const id = new anchor.BN(auctionId);
+    const [pool] = await PublicKey.findProgramAddress(
+      [Buffer.from(POOL_SEED),
+      id.toArrayLike(Buffer, 'le', 8),
+      mint.toBuffer()],
+      program.programId
+    );
+
+    const builder = program.methods.setWinner();
+
+    builder.accounts({
+      partner: ADMIN_WALLET.publicKey,
+      pool: pool
+    });
+
+    builder.signers([ADMIN_WALLET]);
+    const response = await builder.simulate({
+      commitment: 'confirmed'
+    });
+    console.log('response', response);
+    if (!response) return false;
+    const txId = await builder.rpc();
+    console.log('txId', txId);
+    if (!txId) return false;
+
+    return true;
+  }
+  catch (error) {
+    // console.log('error', error);
   }
 
   return false;

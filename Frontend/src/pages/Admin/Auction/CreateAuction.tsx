@@ -35,9 +35,12 @@ const CreateAuction = () => {
     discord: ``,
     twitter: ``,
     min_bid_amount: ``,
+    min_bid_increment: ``,
     min_nft_count: ``,
     start_date: new Date(),
     end_date: new Date(),
+    symbol: ``,
+    collectionName: ``,
     mint: ``,
     tokenId: 0,
     tokenName: ``
@@ -56,11 +59,14 @@ const CreateAuction = () => {
       payload.append("project", 'Yogesh');
       payload.append("description", auctionValue.description);
       payload.append("image", auctionValue.image);
+      payload.append("symbol", auctionValue.symbol);
+      payload.append("collectionName", auctionValue.collectionName);
       payload.append("tokenId", auctionValue.tokenId);
       payload.append("tokenName", auctionValue.tokenName);
       payload.append("discord", auctionValue.discord);
       payload.append("twitter", auctionValue.twitter);
       payload.append("min_bid_amount", auctionValue.min_bid_amount);
+      payload.append("min_bid_increment", auctionValue.min_bid_increment);
       payload.append("min_nft_count", auctionValue.min_nft_count);
       payload.append(
         "start_date",
@@ -237,6 +243,30 @@ const CreateAuction = () => {
                         setAuctionValue({
                           ...auctionValue,
                           min_bid_amount: prettyNumber(e.target.value),
+                        })
+                      }
+                      className="bg-[#46464680] w-full text-[#fff] placeholder:text-[#606060] p-3 outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="mb-5">
+                  <label
+                    className="text-white text-lg inline-block mb-1"
+                    htmlFor="bidIncrement"
+                  >
+                    Min. Bid Increment
+                  </label>
+                  <div className="relative border-2 border-[#606060] rounded-[0.5rem] overflow-hidden">
+                    <input
+                      id="bidIncrement"
+                      name="bidIncrement"
+                      placeholder="0"
+                      type={`string`}
+                      value={auctionValue.min_bid_increment}
+                      onChange={(e) =>
+                        setAuctionValue({
+                          ...auctionValue,
+                          min_bid_increment: prettyNumber(e.target.value),
                         })
                       }
                       className="bg-[#46464680] w-full text-[#fff] placeholder:text-[#606060] p-3 outline-none"

@@ -30,6 +30,8 @@ const createUser = async (data: any) => {
       const { signedMessage } = data;
       const verified = await authService.verify(wallet, signedMessage, 2);
       console.log('verified', wallet, signedMessage, verified);
+      console.log('wallet', wallet)
+      console.log('verified', verified)
       if (!verified) return null;
         const saveUser = new User({
             walletAddress: wallet,

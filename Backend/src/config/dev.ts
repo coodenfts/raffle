@@ -13,16 +13,18 @@ export default {
   DECIMAL: 1000000000,
   PRICEPERBYTE: 0.00000001,
   SOLANA_NETWORK: 'devnet',
+  MAGICEDEN_API_KEY: `c0f5e640-575c-417f-b5c9-4f9c91bbaab4`,
+  TOKEN_ADDRESS: '55u5jMiJtwsvyo834R2mmcrxMGu7x2KvbrguJNbHFnEJ',
 
   AUCTION: {
-    PROGRAM_ID: '2pKctoN7q3VoqWq78BKLGdwmGfzE2UHrPphqTm4D7pjH',
+    PROGRAM_ID: 'G4xDbEByUfbwPivCKjrZ4HeHGuUnrkrZJq5yfdytqbVr',
     POOL_SEED: 'pool',
     IDL: AUCTION_IDL.IDL,
     PAY_TOKEN_DECIMAL: 1000000000,
     message: 'Auction Message'
   },
   RAFFLE: {
-    PROGRAM_ID: '9XmsktwqP1zuPTGhfCgSKVBh5HHKVbiCqeRqzCY8qpB',
+    PROGRAM_ID: 'FinEbPq6qYgmjmF3qZTi6NLLDRnz2n3N1SgMnZTyKpvt',
     POOL_SEED: 'pool',
     IDL: RAFFLE_IDL.IDL,
     PAY_TOKEN_DECIMAL: 1000000000,

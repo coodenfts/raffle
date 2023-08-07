@@ -38,6 +38,7 @@ const EditRaffle = () => {
     project: ``,
     description: ``,
     image: ``,
+    symbol: ``,
     discord: ``,
     twitter: ``,
     total_tickets: 0,
@@ -66,6 +67,7 @@ const EditRaffle = () => {
       payload.append("project", 'yogesh');
       payload.append("description", raffleValue.description);
       payload.append("image", raffleValue.image);
+      payload.append("symbol", raffleValue.symbol);
       payload.append("tokenId", raffleValue.tokenId);
       payload.append("tokenName", raffleValue.tokenName);
       payload.append("discord", raffleValue.discord);
@@ -187,9 +189,9 @@ const EditRaffle = () => {
           const poolData: any = await program.account.pool.fetch(pool);
           console.log('poolData', poolData)
 
-          const smallTimeThanStartDate = nftInfoById.start_date * 1000 > Date.now();
-          const noBidderBigThanEndDate = poolData.purchased_ticket === 0 && Date.now() > nftInfoById.end_date * 1000
-
+          const currentTime = Math.floor(Date.now() / 1000);
+          const smallTimeThanStartDate =  nftInfoById?.start_date  > currentTime;
+          const noBidderBigThanEndDate = poolData.purchasedTicket === 0 &&  nftInfoById?.end_date < currentTime
 
           if (smallTimeThanStartDate || noBidderBigThanEndDate) {
             setUpdateBtnActive(true)

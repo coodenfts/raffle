@@ -11,6 +11,9 @@ import {
 
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { getParsedAccountByMint } from '@nfteyez/sol-rayz';
+import { makeTransaction } from '../../helper/composables/sol/connection';
+import createAssociatedTokenAccountInstruction from '../../helper/composables';
+import { delay } from '../../utils';
 
 import CONFIG from "../../config";
 import { AnchorWallet, WalletContext, WalletContextState } from '@solana/wallet-adapter-react';
@@ -19,6 +22,7 @@ const {
   AUCTION,
   CLUSTER_API,
   TokenAddress,
+  ADMIN_WALLET,
   DECIMAL
 } = CONFIG;
 
@@ -56,11 +60,15 @@ export const createForAuction = async (
     const startTime = Math.floor(nftInfo.start_date?.getTime() / 1000).toString()
     const endTime = Math.floor(nftInfo.end_date?.getTime() / 1000).toString()
     const minNftCount = Number(nftInfo.min_nft_count)
+
+    console.log("=========min_bid_amount", nftInfo.min_bid_amount)
+    console.log("=========min_bid_increment", nftInfo.min_bid_increment)
     const builder = program.methods.createAuction(
       id,
       startTime,
       endTime,
-      new anchor.BN(nftInfo.min_bid_amount * CONFIG.DECIMAL),
+      new anchor.BN(Number(nftInfo.min_bid_amount) * CONFIG.DECIMAL),
+      new anchor.BN(Number(nftInfo.min_bid_increment) * CONFIG.DECIMAL),
       minNftCount
     );
 
@@ -121,7 +129,8 @@ export const updateForAuction = async (
       startTime,
       endTime,
       new anchor.BN(nftInfo.min_bid_amount * CONFIG.DECIMAL),
-      minNftCount
+      new anchor.BN(nftInfo.min_bid_increment * CONFIG.DECIMAL),
+      minNftCount,
     );
     builder.accounts({
       admin: wallet.publicKey,
@@ -279,7 +288,14 @@ export const updateBidForAuction = async (
     });
 
     builder.signers([]);
-    const txId = await builder.rpc();
+    let txId
+    try {
+      txId = await builder.rpc();
+      await delay(7  * 1000)
+      console.log('txId', txId)
+    } catch(error) {
+
+    }
     if (!txId) return false;
     console.log('txId', txId)
     return true;
@@ -327,8 +343,14 @@ export const cancelBidForAuction = async (
     });
     builder.signers([]);
 
-    const txId = await builder.rpc();
-    console.log('txId', txId)
+    let txId
+    try {
+      txId = await builder.rpc();
+      await delay(7  * 1000)
+      console.log('txId', txId)
+    } catch(error) {
+
+    }
     if (!txId) return false;
 
     return true;
@@ -375,14 +397,74 @@ export const claimBid = async (
     });
 
     builder.signers([]);
-    const txId = await builder.rpc();
-    console.log('txId', txId)
+    let txId
+    try {
+      txId = await builder.rpc();
+      await delay(7  * 1000)
+      console.log('txId', txId)
+    } catch(error) {
+
+    }
     if (!txId) return false;
 
     return true;
 
   }
   catch (error) {
+    return null;
+  }
+}
+
+export const claimAllBid = async (
+  wallet: any,
+  nftInfos: any[],
+) => {
+  try {
+    const provider = new anchor.AnchorProvider(connection, wallet, {
+      skipPreflight: true,
+      preflightCommitment: 'confirmed' as Commitment,
+    } as ConnectionConfig)
+
+    const program = new anchor.Program(AUCTION.IDL, AUCTION.PROGRAM_ID, provider);
+    let instructions: any = [], signers: any = [];
+    
+    for(let i = 0; i < nftInfos.length; i++) { 
+      const id = nftInfos[i].auctionId
+      const [pool] = await PublicKey.findProgramAddress([
+        Buffer.from(AUCTION.POOL_SEED),
+        id.toArrayLike(Buffer, 'le', 8),
+        nftInfos[i].mint.toBuffer()
+      ], new PublicKey(AUCTION.PROGRAM_ID))
+  
+      let ataFrom = await getAssociatedTokenAddress(new PublicKey(TokenAddress), pool, true);
+      let ataTo = await getAssociatedTokenAddress(new PublicKey(TokenAddress), wallet.publicKey)
+
+      const ataToInfo = await connection.getAccountInfo(ataTo);
+      if (!ataToInfo) {
+        instructions.push(createAssociatedTokenAccountInstruction(wallet.publicKey, ataTo, wallet.publicKey, new PublicKey(CONFIG.TokenAddress)))
+      }
+
+      instructions.push(program.instruction.claimBid({
+        accounts: {
+          bidder: wallet.publicKey,
+          pool: pool,
+          payMint: TokenAddress,
+          ataFrom: ataFrom,
+          ataTo: ataTo,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+          rent: SYSVAR_RENT_PUBKEY
+        }
+      }))
+    }
+    const transaction = await makeTransaction(connection, instructions, signers, wallet.publicKey)
+  
+    return transaction
+
+  }
+  catch (error) {
+    console.log('error', error)
     return null;
   }
 }
@@ -411,13 +493,20 @@ export const claimPrize = async (
     let ataFrom = await getAssociatedTokenAddress(new PublicKey(nftInfo.mint), pool, true);
     let ataTo = await getAssociatedTokenAddress(new PublicKey(nftInfo.mint), wallet.publicKey)
 
+    let tokenFrom = await getAssociatedTokenAddress(new PublicKey(TokenAddress), pool, true);
+    let tokenTo = await getAssociatedTokenAddress(new PublicKey(TokenAddress), new PublicKey(ADMIN_WALLET))
+
     const builder = program.methods.claimPrize();
     builder.accounts({
+      admin: new PublicKey(ADMIN_WALLET),
       bidder: wallet.publicKey,
       pool: pool,
       mint: new PublicKey(nftInfo.mint),
       ataFrom: ataFrom,
       ataTo: ataTo,
+      payMint: new PublicKey(TokenAddress),
+      tokenFrom: tokenFrom,
+      tokenTo: tokenTo,
       tokenProgram: TOKEN_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
@@ -425,8 +514,14 @@ export const claimPrize = async (
     });
 
     builder.signers([]);
-    const txId = await builder.rpc();
-    console.log('txId', txId)
+    let txId
+    try {
+      txId = await builder.rpc();
+      await delay(7  * 1000)
+      console.log('txId', txId)
+    } catch(error) {
+
+    }
     if (!txId) return false;
 
     return true;

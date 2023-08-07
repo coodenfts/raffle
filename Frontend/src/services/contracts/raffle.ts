@@ -12,12 +12,17 @@ import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_I
 
 import CONFIG from "../../config";
 import { getParsedNftAccountsByOwner, getParsedAccountByMint } from '@nfteyez/sol-rayz';
-import { getMetadataAccount } from '../../utils';
+import { delay, getMetadataAccount } from '../../utils';
+import { makeTransaction } from '../../helper/composables/sol/connection';
+import createAssociatedTokenAccountInstruction from '../../helper/composables';
+
+const Promise = require('bluebird') ;
 
 const {
   RAFFLE,
   CLUSTER_API,
-  TokenAddress
+  TokenAddress,
+  ADMIN_WALLET
 } = CONFIG;
 
 const connection = new Connection(CLUSTER_API, {
@@ -222,8 +227,10 @@ export const buyTicketsForRaffle = async (
       new PublicKey(nftInfo.mint).toBuffer()
     ], new PublicKey(RAFFLE.PROGRAM_ID))
 
-    let ataFrom = await getAssociatedTokenAddress(new PublicKey(TokenAddress), wallet.publicKey);
-    let ataTo = await getAssociatedTokenAddress(new PublicKey(TokenAddress), pool, true)
+    let ataFrom = await getAssociatedTokenAddress(new PublicKey(TokenAddress), wallet.publicKey, true);
+    let ataTo = await getAssociatedTokenAddress(new PublicKey(TokenAddress), new PublicKey(ADMIN_WALLET))
+
+    console.log('ataTo', ataTo)
 
     let MintTokenAccount = await getAssociatedTokenAddress(new PublicKey(lists[0].mint), wallet.publicKey)
     const metadata = await getMetadataAccount(lists[0].mint)
@@ -236,10 +243,11 @@ export const buyTicketsForRaffle = async (
     const builder = program.methods.buyTicket(amount, lists.length);
     builder.accounts({
       buyer: wallet.publicKey,
+      admin: new PublicKey(ADMIN_WALLET),
       pool: pool,
       mint: new PublicKey(lists[0].mint),
       mintToken: MintTokenAccount,
-      payMint: TokenAddress,
+      payMint: new PublicKey(TokenAddress),
       ataFrom: ataFrom,
       ataTo: ataTo,
       metadata: metadata,
@@ -250,8 +258,16 @@ export const buyTicketsForRaffle = async (
     });
 
     builder.signers([]);
-    const txId = await builder.rpc();
-    console.log('txId', txId)
+    let txId
+    try {
+      txId = await builder.rpc();
+      await delay(7  * 1000)
+      console.log('txId', txId)
+    } catch(error) {
+
+    }
+
+
     if (!txId) return false;
 
     return true;
@@ -348,6 +364,61 @@ export const claimPrizeForRaffle = async (
     });
 
     builder.signers([]);
+    let txId
+    try {
+      txId = await builder.rpc();
+      await delay(7  * 1000)
+      console.log('txId', txId)
+    } catch(error) {
+
+    }
+    if (!txId) return false;
+
+    return true;
+
+  }
+  catch (error) {
+    return null;
+  }
+}
+
+export const claimCoodeForAdmin = async (
+  wallet: any,
+  nftInfo: any,
+
+) => {
+  try {
+    const provider = new anchor.AnchorProvider(connection, wallet, {
+      skipPreflight: true,
+      preflightCommitment: 'confirmed' as Commitment,
+    } as ConnectionConfig)
+
+
+    const program = new anchor.Program(RAFFLE.IDL, RAFFLE.PROGRAM_ID, provider);
+
+    const id = new anchor.BN(nftInfo.id)
+    const [pool] = await PublicKey.findProgramAddress([
+      Buffer.from(RAFFLE.POOL_SEED),
+      id.toArrayLike(Buffer, 'le', 8),
+      new PublicKey(nftInfo.mint).toBuffer()
+    ], new PublicKey(RAFFLE.PROGRAM_ID))
+    let ataFrom = await getAssociatedTokenAddress(new PublicKey(TokenAddress), pool, true);
+    let ataTo = await getAssociatedTokenAddress(new PublicKey(TokenAddress), new PublicKey(ADMIN_WALLET))
+
+    const builder = program.methods.claimCoode();
+    builder.accounts({
+      admin: wallet.publicKey,
+      pool: pool,
+      payMint: new PublicKey(TokenAddress),
+      ataFrom: ataFrom,
+      ataTo: ataTo,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+      rent: SYSVAR_RENT_PUBKEY
+    });
+
+    builder.signers([]);
     const txId = await builder.rpc();
     console.log('txId', txId)
     if (!txId) return false;
@@ -360,18 +431,72 @@ export const claimPrizeForRaffle = async (
   }
 }
 
+// export const claimCoodeForAdmin = async (
+//   wallet: any,
+//   nftInfos: any[],
+// ) => {
+//   try {
+//     const provider = new anchor.AnchorProvider(connection, wallet, {
+//       skipPreflight: true,
+//       preflightCommitment: 'confirmed' as Commitment,
+//     } as ConnectionConfig)
+
+//     const program = new anchor.Program(RAFFLE.IDL, RAFFLE.PROGRAM_ID, provider);
+//     let instructions: any = [], signers: any = [];
+    
+//     for(let i = 0; i < nftInfos.length; i++) { 
+//       const id = new anchor.BN(nftInfos[i].id)
+//       const [pool] = await PublicKey.findProgramAddress([
+//         Buffer.from(RAFFLE.POOL_SEED),
+//         id.toArrayLike(Buffer, 'le', 8),
+//         new PublicKey(nftInfos[i].mint).toBuffer()
+//       ], new PublicKey(RAFFLE.PROGRAM_ID))
+  
+//       let ataFrom = await getAssociatedTokenAddress(new PublicKey(TokenAddress), pool, true);
+//       let ataTo = await getAssociatedTokenAddress(new PublicKey(TokenAddress), wallet.publicKey)
+
+//       const ataToInfo = await connection.getAccountInfo(ataTo);
+//       if (!ataToInfo) {
+//         instructions.push(createAssociatedTokenAccountInstruction(wallet.publicKey, ataTo, wallet.publicKey, new PublicKey(CONFIG.TokenAddress)))
+//       }
+
+//       instructions.push(program.instruction.claimCoode({
+//         accounts: {
+//           admin: new PublicKey(ADMIN_WALLET),
+//           pool: pool,
+//           payMint: TokenAddress,
+//           ataFrom: ataFrom,
+//           ataTo: ataTo,
+//           tokenProgram: TOKEN_PROGRAM_ID,
+//           associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+//           systemProgram: SystemProgram.programId,
+//           rent: SYSVAR_RENT_PUBKEY
+//         }
+//       }))
+//     }
+//     const transaction = await makeTransaction(connection, instructions, signers, wallet.publicKey)
+  
+//     return transaction
+
+//   }
+//   catch (error) {
+//     console.log('error', error)
+//     return null;
+//   }
+// }
+
 
 export const VerifyCollection = async (
   walletAddress: any,
   connection: any
 ) => {
   try {
-    const lists = await getParsedNftAccountsByOwner({
+    const lists = Promise.all(await getParsedNftAccountsByOwner({
       publicAddress: walletAddress,
       connection
-    })
+    }))
     try {
-       const filter_lists = lists.filter((item: any) => item.data.creators && item.data.creators[0].address === CONFIG.CREATOR_ADDRESS);
+       const filter_lists = await Promise.all(await lists.filter((item: any) => item.data?.creators && item.data?.creators[0]?.address === CONFIG.CREATOR_ADDRESS));
 
        if (filter_lists.length > 0) {
          return {
@@ -390,6 +515,7 @@ export const VerifyCollection = async (
    
 
   } catch (error) {
+
     return null
   }
 }

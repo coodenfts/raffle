@@ -37,10 +37,12 @@ const EditAuction = () => {
     project: ``,
     description: ``,
     image: ``,
+    symbol: ``,
     imageFile: "",
     discord: ``,
     twitter: ``,
     min_bid_amount: ``,
+    min_bid_increment: ``,
     min_nft_count: ``,
     start_date: new Date(),
     end_date: new Date(),
@@ -64,11 +66,13 @@ const EditAuction = () => {
       payload.append("project", 'yogesh');
       payload.append("description", auctionValue.description);
       payload.append("image", auctionValue.image);
+      payload.append("symbol", auctionValue.symbol);
       payload.append("tokenId", auctionValue.tokenId);
       payload.append("tokenName", auctionValue.tokenName);
       payload.append("discord", auctionValue.discord);
       payload.append("twitter", auctionValue.twitter);
       payload.append("min_bid_amount", auctionValue.min_bid_amount);
+      payload.append("min_bid_increment", auctionValue.min_bid_increment);
       payload.append("min_nft_count", auctionValue.min_nft_count);
       payload.append(
         "start_date",
@@ -179,8 +183,9 @@ const EditAuction = () => {
           const poolData: any = await program.account.pool.fetch(pool);
           console.log('poolData', poolData)
 
-          const smallTimeThanStartDate = nftInfoById.start_date * 1000 > Date.now();
-          const noBidderBigThanEndDate = poolData.count === 0 && Date.now() > nftInfoById.end_date * 1000
+          const currentTime = Math.floor(Date.now() / 1000);
+          const smallTimeThanStartDate =  nftInfoById?.start_date  > currentTime;
+          const noBidderBigThanEndDate = poolData.count === 0 &&  nftInfoById?.end_date < currentTime
 
 
           if (smallTimeThanStartDate || noBidderBigThanEndDate) {
@@ -284,6 +289,31 @@ const EditAuction = () => {
                         setAuctionValue({
                           ...auctionValue,
                           min_bid_amount: prettyNumber(e.target.value),
+                        })
+                      }
+                      className="bg-[#46464680] w-full text-[#fff] placeholder:text-[#606060] p-3 outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="mb-5">
+                  <label
+                    className="text-white text-lg inline-block mb-1"
+                    htmlFor="bidIncrement"
+                  >
+                    Min. Bid Increment
+                  </label>
+                  <div className="relative border-2 border-[#606060] rounded-[0.5rem] overflow-hidden">
+                    <input
+                      id="bidIncrement"
+                      name="bidIncrement"
+                      placeholder="0"
+                      type={`number`}
+                      min="0"
+                      value={auctionValue.min_bid_increment}
+                      onChange={(e) =>
+                        setAuctionValue({
+                          ...auctionValue,
+                          min_bid_increment: prettyNumber(e.target.value),
                         })
                       }
                       className="bg-[#46464680] w-full text-[#fff] placeholder:text-[#606060] p-3 outline-none"

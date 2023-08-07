@@ -14,14 +14,14 @@ export const PRICEPERBYTE = 0.00000001;
 export const DECIMAL = 1000000000
 export const TOAST_TIME_OUT = 2000;
 export const AUCTION: any = {
-  PROGRAM_ID: '66Eid29SYKM64KLC2fsnnCZ12YJNACiJRnfhhVui3d3u',
+  PROGRAM_ID: 'AHXFqPbBRnxPcNStkzQumQBfUV5L7vN1EL3i3jpKzpWn',
   POOL_SEED: 'pool',
   IDL: AUCTION_IDL.IDL,
   message: 'Auction Message'
 }
 
 export const RAFFLE = {
-  PROGRAM_ID: 'DYUw8M1XatBe8NTAqJRuVWFVfFbS2GMEesS68wMsokDH',
+  PROGRAM_ID: '5yCc6fGQwcKSyDKADVKXLAQYB4mDTZiHNZVXjvQqVXgB',
   POOL_SEED: 'pool',
   IDL: RAFFLE_IDL.IDL,
   message: 'Raffle Message'

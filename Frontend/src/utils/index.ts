@@ -81,10 +81,11 @@ export async function getNftMetaDataByMint(mintAddress: string) {
   )
 
   let accountInfo = await connection.getAccountInfo(program[0])
-  let metadata = await decodeMetadata(accountInfo.data)
+  if(!accountInfo)
+    return { }
+  let metadata: any = await decodeMetadata(accountInfo.data)
 
-  const result =
-    await fetch(metadata.data.uri)
+  const result = await fetch(metadata?.data.uri)
       .then(res => res.json())
       .catch(() => null)
 

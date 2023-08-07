@@ -16,7 +16,8 @@ import { datetimeLocal, getNftMetaDataByMint } from "../../../utils";
 import UserFilterRaffle from "./FilterRaffle";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { VerifyCollection } from "../../../services/contracts/raffle";
+import { VerifyCollection, claimCoodeForAdmin } from "../../../services/contracts/raffle";
+import { signAndSendTransactions } from "../../../helper/composables/sol/connection";
 
 const { Backend_URL, RAFFLE } = CONFIG;
 
@@ -34,6 +35,7 @@ const UserRaffle = () => {
   const [isAllRaffles, setAllRaffles] = useState(false);
   const [isPastRaffles, setPastRaffles] = useState(false);
   const [isFilterRaffles, setFilterRaffles] = useState(false);
+  const [menuIndex, setMenuIndex] = useState(0)
 
   const [filterData, setFilterData] = useState<any>({
     tokenId: ``,
@@ -44,6 +46,7 @@ const UserRaffle = () => {
   const [searchNft, setSearchNft] = useState(``)
   const [buyTicketNFT, setBuyTicketNFT] = useState([])
   const [walletBalance, setWalletBalance] = useState(0)
+  const currentTime = Math.floor(Date.now() / 1000);
 
   const handleFeatured = () => {
     setFeatured(true);
@@ -64,11 +67,17 @@ const UserRaffle = () => {
     setFilterRaffles(false);
   };
   const handleFilterRaffles = () => {
-    setFeatured(false);
-    setAllRaffles(false);
-    setPastRaffles(false);
-    setFilterRaffles(true);
+    // setFeatured(false);
+    // setAllRaffles(false);
+    // setPastRaffles(false);
+    setFilterRaffles(!isFilterRaffles);
   };
+
+  const handleKeyPress = (e: any) => {
+    if(e.key === 'Enter') {
+      handleFilterApplyBtn()
+    }
+  }
 
   const handleSearchNft = (input: any) => {
     setSearchNft(input)
@@ -77,23 +86,49 @@ const UserRaffle = () => {
     setFilterByItem(filtered_name)
   }
 
-  const handleExpiringSoonSort = () => {
-    const res = isFilterByItem.sort((a: any, b: any) => a.end_date - b.end_date)
+  const handleRecentlyAdded = () => {
+    const res = raffleData.sort((a: any, b: any) => b?.id - a?.id)
     setFilterByItem([...res])
+    setMenuIndex(0)
   }
 
-  const handleSellingOutSoonSort = () => {
-    const res = isFilterByItem.sort((a: any, b: any) => a.count - b.count)
+  const handleExpiringSoonSort = () => {
+    // isFilterByItem
+    const res = raffleData.sort((a: any, b: any) => a.end_date - b.end_date).filter((item: any) => currentTime > item.start_date && currentTime < item.end_date)
     setFilterByItem([...res])
+    setMenuIndex(1)
+  }
+
+  
+  const handleSellingOutSoonSort = () => {
+    // isFilterByItem
+    const res = raffleData.sort((a: any, b: any) => a.count - b.count).filter((item: any) => currentTime > item.start_date && currentTime < item.end_date)
+    setFilterByItem([...res])
+    setMenuIndex(2)
   }
 
   const handlePriceAscendingSort = () => {
     const res = raffleData.sort((a: any, b: any) => a.price - b.price)
     setFilterByItem([...res])
+    setMenuIndex(3)
   }
+
   const handlePriceDescendingSort = () => {
     const res = raffleData.sort((a: any, b: any) => b.price - a.price)
     setFilterByItem([...res])
+    setMenuIndex(4)
+  }
+
+  const handleFloorAscendingSort = () => {
+    const res = raffleData.sort((a: any, b: any) => a.floor_price - b.floor_price)
+    setFilterByItem([...res])
+    setMenuIndex(5)
+  }
+
+  const handleFloorDescendingSort = () => {
+    const res = raffleData.sort((a: any, b: any) => b.floor_price - a.floor_price)
+    setFilterByItem([...res])
+    setMenuIndex(6)
   }
 
   const handleFilterApplyBtn = () => {
@@ -120,6 +155,39 @@ const UserRaffle = () => {
       name: ``,
       endDate: new Date
     })
+  }
+
+  const handleClaimCoode = async () => {
+    console.log('pastData', pastData)
+    const filterData = pastData.filter(item => item.purchasedTicket > 0)
+    console.log('filterData', filterData)  
+
+    let getTx = null;
+    let transactions: any[] = [];
+
+    if(pastData.length > 0) {
+      getTx = await claimCoodeForAdmin(anchorWallet, pastData)
+      if(getTx) {
+        transactions.push(getTx);
+      }
+
+      try {
+        const res = await signAndSendTransactions(connection, anchorWallet!, transactions);
+        if (res?.txid) {
+          toast.success("Success on Claim Coode");
+        } else {
+          toast.error("Fail on Claim Coode");
+          return
+        }
+      
+      } catch (error) {
+        toast.error("Fail on Claim Coode");
+        return
+      }
+    } else {
+      toast.error("There is no ended raffles");
+    }
+    
   }
 
 
@@ -159,14 +227,28 @@ const UserRaffle = () => {
         if (exist_pool) {
          try {
           const poolData: any = await program.account.pool.fetch(pool);
+
+          const buyer = poolData?.buyers.find((item: any) => {
+            return item.buyer.toString() === anchorWallet?.publicKey?.toString();
+          });
+
+          const winnerInfo = poolData?.buyers.find((item: any) => item.purchasedTicket >0 && item.isWinner === 1)
+          let winnerWalletAddress = ''
+          if(winnerInfo){
+            winnerWalletAddress = winnerInfo.buyer.toString()
+          }
+
           const res = {
             ...getRaffle[i],
             count: poolData.count,
             purchasedTicket: poolData.purchasedTicket ? poolData?.purchasedTicket : 0,
+            myTicket: buyer ? buyer.purchasedTicket: 0,
+            winnerWalletAddress,
+            endTime: poolData.endTime
           };
           final_raffle_All.push(res)
          } catch (error) {
-          console.log('123123123', error)
+          console.log('error', error)
          }
           
         } else {
@@ -175,8 +257,8 @@ const UserRaffle = () => {
         }
       }
 
-      setFilterByItem([...final_raffle_All])
-      setRaffleData([...final_raffle_All]);
+      setFilterByItem([...final_raffle_All].sort((a: any, b: any) => b?.id - a?.id))
+      setRaffleData([...final_raffle_All].sort((a: any, b: any) => b?.id - a?.id));
 
       const featuredData = final_raffle_All.filter(
         (item: any) => item.end_date >= Date.now() / 1000 && Date.now() / 1000 >= item.start_date
@@ -185,8 +267,8 @@ const UserRaffle = () => {
         (item: any) => item.end_date < Date.now() / 1000
       );
 
-      setFeaturedData(featuredData);
-      setPastData(pastData);
+      setFeaturedData(featuredData.sort((a: any, b: any) => b?.id - a?.id));
+      setPastData(pastData.sort((a: any, b: any) => b?.id - a?.id));
 
     } catch (error) {
     }
@@ -214,6 +296,7 @@ const UserRaffle = () => {
         } catch (error) {
 
         }
+        await getData();
       }
     )()
 
@@ -225,6 +308,7 @@ const UserRaffle = () => {
       <Menus />
       <div className="max-w-[1280px] m-auto pt-8 px-4">
         <div className="flex md:flex-col lg:flex-row justify-between items-center">
+          <div className="flex">
           <button
             type="button"
             onClick={handleFilterRaffles}
@@ -247,7 +331,36 @@ const UserRaffle = () => {
             </svg>
             <span className="inline-block ml-2 text-base">Filter</span>
           </button>
-          <div className="flex items-center justify-between xl:basis-[35%] sm:w-[400px] sm:my-4 lg:my-0">
+          {/* {
+           CONFIG.ADMIN_WALLET === anchorWallet?.publicKey.toString() && <button
+            type="button"
+            onClick={handleClaimCoode}
+            className={`${
+            "flex items-center py-3 ml-2 px-5 hover:bg-white hover:text-black text-white border border-white rounded-[0.7rem]"
+              }`}
+          >
+            <span className="inline-block ml-2 text-base">Claim Coode</span>
+          </button>
+          } */}
+          </div>
+          {/* {
+            isFilterRaffles && */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search"
+                className=" text-[#fff] placeholder:text-[#9B9B9B] bg-[#46464680] text-base p-3 rounded-[0.6rem] border border-[#606060] outline-none text-[#9B9B9B]"
+                value={searchNft}
+                onChange={(e) => handleSearchNft(e.target.value)}
+              />
+              <img
+                src={searchIcon}
+                alt="searchIcon"
+                className="absolute top-[12px] right-[10px] w-[26px]"
+              />
+            </div>
+          {/* } */}
+          <div className="flex items-center justify-between xl:basis-[33%] sm:w-[400px] sm:my-4 lg:my-0">
             <button
               type="button"
               onClick={handleFeatured}
@@ -279,23 +392,6 @@ const UserRaffle = () => {
               Past Raffles
             </button>
           </div>
-          {
-            isFilterRaffles &&
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search"
-                className=" text-[#fff] placeholder:text-[#9B9B9B] bg-[#46464680] text-base p-3 rounded-[0.6rem] border border-[#606060] outline-none text-[#9B9B9B]"
-                value={searchNft}
-                onChange={(e) => handleSearchNft(e.target.value)}
-              />
-              <img
-                src={searchIcon}
-                alt="searchIcon"
-                className="absolute top-[12px] right-[10px] w-[26px]"
-              />
-            </div>
-          }
         </div>
         {/* Filter Raffle Tab  */}
         {isFilterRaffles && (
@@ -311,12 +407,19 @@ const UserRaffle = () => {
                     <div className="basis-[22%]">
                       <div className="border-4 border-[#606060] bg-white p-4 mt-6 rounded-[0.6rem]">
                         <h1 className="text-3xl">Sort</h1>
-                        <p className="text-lg ml-1">Recently Added</p>
                         <ul className="ml-1">
+                           <li className="my-2">
+                            <p
+                              onClick={handleRecentlyAdded}
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 0 && "font-bold"}`}
+                            >
+                              Recently Added
+                            </p>
+                          </li>
                           <li className="my-2">
                             <p
                               onClick={handleExpiringSoonSort}
-                              className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 1 && "font-bold"}`}
                             >
                               Expiring Soon
                             </p>
@@ -324,7 +427,7 @@ const UserRaffle = () => {
                           <li className="my-2">
                             <p
                               onClick={handleSellingOutSoonSort}
-                              className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 2 && "font-bold"}`}
                             >
                               Selling Out Soon
                             </p>
@@ -332,29 +435,31 @@ const UserRaffle = () => {
                           <li className="my-2">
                             <p
                               onClick={handlePriceAscendingSort}
-                              className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 3 && "font-bold"}`}
                             >
-                              Price (Ascending)
+                              Ticket Price (Ascending)
                             </p>
                           </li>
                           <li className="my-2">
                             <p
                               onClick={handlePriceDescendingSort}
-                              className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 4 && "font-bold"}`}
                             >
-                              Price (Descending)
+                              Ticket Price (Descending)
                             </p>
                           </li>
                           <li className="my-2">
                             <p
-                              className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
+                              onClick={handleFloorAscendingSort}
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 5 && "font-bold"}`}
                             >
                               Floor (Ascending)
                             </p>
                           </li>
                           <li className="my-2">
                             <p
-                              className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
+                              onClick={handleFloorDescendingSort}
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 6 && "font-bold"}`}
                             >
                               Floor (Descending)
                             </p>
@@ -373,6 +478,7 @@ const UserRaffle = () => {
                                 className="bg-[#46464680] w-full text-[#000] placeholder:text-[#606060] p-3 outline-none"
                                 value={filterData.tokenId}
                                 onChange={(e) => setFilterData({ ...filterData, tokenId: e.target.value })}
+                                onKeyPress={(e) => handleKeyPress(e)}
                               />
                             </div>
                           </div>
@@ -387,6 +493,7 @@ const UserRaffle = () => {
                                 className="bg-[#46464680] w-full text-[#000] placeholder:text-[#606060] p-3 outline-none"
                                 value={filterData.name}
                                 onChange={(e) => setFilterData({ ...filterData, name: e.target.value })}
+                                onKeyPress={(e) => handleKeyPress(e)}
                               />
                             </div>
                           </div>
@@ -400,6 +507,7 @@ const UserRaffle = () => {
                                   name="collection"
                                   placeholder="Minimum"
                                   className="bg-[#46464680] w-full text-[#000] placeholder:text-[#606060] p-3 outline-none"
+                                  onKeyPress={(e) => handleKeyPress(e)}
                                 />
                               </div>
                               <div className="basis-[48%] relative border border-[#606060] rounded-[0.5rem] overflow-hidden">
@@ -409,6 +517,7 @@ const UserRaffle = () => {
                                   name="collection"
                                   placeholder="Maximum"
                                   className="bg-[#46464680] w-full text-[#606060] placeholder:text-[#606060] p-3 outline-none"
+                                  onKeyPress={(e) => handleKeyPress(e)}
                                 />
                               </div>
                             </div>
@@ -424,6 +533,7 @@ const UserRaffle = () => {
                                 className="bg-[#46464680] w-full text-[#000] placeholder:text-[#606060] p-3 outline-none"
                                 value={datetimeLocal(filterData.endDate)}
                                 onChange={(e) => setFilterData({ ...filterData, endDate: new Date(e.target.value) })}
+                                onKeyPress={(e) => handleKeyPress(e)}
                               />
                             </div>
                           </div>

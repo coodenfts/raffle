@@ -14,7 +14,12 @@ import Navbar from "../../../components/Navbar";
 import TwitterBlack from "../../../assets/Twitter-black.png";
 import DiscordBlack from "../../../assets/Discord-Black.png";
 import infoIconBlack from "../../../assets/InfoIconBlack.png";
-import { toast } from "react-toastify";
+import { ToastContainer, toast } from "react-toastify";
+import { signAndSendTransactions } from "../../../helper/composables/sol/connection";
+
+import { claimAllBid } from "../../../services/contracts/auction";
+import { DECIMAL } from "../../../config/main";
+import { TextField } from "@material-ui/core";
 
 const { AUCTION, Backend_URL, SIGN_KEY } = CONFIG;
 
@@ -32,6 +37,11 @@ const AuctionProfile = () => {
   const [social, setSocial] = useState(false);
 
   const [participantLists, setParticipantLists] = useState<any[]>([])
+  const [unclaimedLists, setUnclaimedLists] = useState<any[]>([])
+
+  const [isAllTab, setAllTab] = useState(true);
+  const [isUnclaimedTab, setUnclaimedTab] = useState(false);
+  const [claimableTokenAmount, setClaimableTokenAmout] = useState(0)
 
   const getData = async () => {
     try {
@@ -58,43 +68,135 @@ const AuctionProfile = () => {
       );
 
       let get_filterField = []
+      let _claimableTokenAmount: number = 0;
       for (let i = 0; i < getAuctions.length; i++) {
-        const raffleId = new anchor.BN(getAuctions[i].id);
+        const auctionId = new anchor.BN(getAuctions[i].id);
         const raffleParam = getAuctions[i]?._id
 
         const [pool] = await PublicKey.findProgramAddress(
           [
             Buffer.from(AUCTION.POOL_SEED),
-            raffleId.toArrayLike(Buffer, "le", 8),
+            auctionId.toArrayLike(Buffer, "le", 8),
             new PublicKey(getAuctions[i].mint).toBuffer(),
           ],
           program.programId
         );
         const poolData: any = await program.account.pool.fetch(pool);
+        console.log('poolData', poolData)
         const findMeINPoolData = poolData.bids.find((item: any) =>
           // item?.bidder?.toString() === anchorWallet?.publicKey?.toString()
           item?.bidder?.toString() === walletAddress
         )
+
+        const filterBidderLists: any = []
+        for (let i = 0; i < poolData?.bids.length; i++) {
+          if (i < poolData?.count) {
+            filterBidderLists.push(poolData?.bids[i])
+          }
+        }
+    
+        let winner_bidderLists = [];
+        for (let i = 0; i < filterBidderLists.length; i++) {
+          winner_bidderLists.push(filterBidderLists[i].price.toNumber())
+        }
+        let high = 0;
+        if(winner_bidderLists.length > 0)
+          high = Math.max.apply(Math, winner_bidderLists);
+       
+        const result: any = filterBidderLists.find((item: any) => item.price.toNumber() === high)
+
+        const winner = poolData.bids.find((item: any) => item.isWinner === 1 && item.bidder.toString() === walletAddress)
+
+
         const currentBid = Number(findMeINPoolData?.price) / CONFIG.DECIMAL
+        const isClaimed = findMeINPoolData?.claimed
+        const isWinner = findMeINPoolData?.isWinner
+        const topBidder = result?.bidder?.toString()
 
         const getMetadata = await getNftMetaDataByMint(getAuctions[i].mint)
-
+        
         if (findMeINPoolData) {
-          get_filterField.push({
+          let filter_item = {
+            ...getAuctions[i],
             ...poolData,
             id: raffleParam,
-            image: getMetadata?.image,
-            name: getMetadata?.data?.name,
-            tokenName: getMetadata?.data?.name.split('#')[0],
-            tokenId: getMetadata?.data?.name.split('#')[1],
-            currentBid
-          })
+            currentBid,
+            isClaimed,
+            isWinner,
+            topBidder,
+          }
+
+          if(winner)
+           filter_item = {...filter_item,  winnerWalletAddress: walletAddress}
+
+          // get_filterField.push({
+          //   image: getMetadata?.image,
+          //   name: getMetadata?.data?.name,
+          //   tokenName: getMetadata?.data?.name.split('#')[0],
+          //   tokenId: getMetadata?.data?.name.split('#')[1],
+          // })
+
+          get_filterField.push({...filter_item})
         }
       }
       setParticipantLists(get_filterField)
+
+      const currentTime = Math.floor(Date.now() / 1000);
+
+      let _unclaimedList = get_filterField.filter((item, index) => item.isClaimed === 0 && item.isWinner === 0 && currentTime > item.endTime && item.topBidder !== walletAddress)
+
+      _unclaimedList.map((item:any)=> {
+        if(item.currentBid && item.topBidder !== walletAddress){
+          _claimableTokenAmount += item.currentBid
+          console.log('currentBid', item.currentBid)
+        }
+      })
+      setClaimableTokenAmout(_claimableTokenAmount)
+      setUnclaimedLists(_unclaimedList)
     } catch (error) {
       console.log('error', error)
     }
+  }
+
+  const handleAllTab = async () => {
+    setUnclaimedTab(false)
+    setAllTab(true)
+  }
+
+  const handleUnclaimedTab = async () => {
+    setUnclaimedTab(true)
+    setAllTab(false)
+  }
+
+  const handleCliamAll = async () => {
+    let getTx = null;
+    let transactions: any[] = [];
+
+    if(unclaimedLists.length > 0) {
+      getTx = await claimAllBid(anchorWallet, unclaimedLists)
+      if(getTx) {
+        transactions.push(getTx);
+      }
+    } else {
+      toast.error("There is no unclaimed NFT");
+      return
+    }
+
+    try {
+      const res = await signAndSendTransactions(connection, anchorWallet!, transactions);
+      if (res?.txid) {
+        toast.success("Success on Claim All");
+        setUnclaimedLists([])
+      } else {
+        toast.error("Fail on Claim All");
+        return
+      }
+    
+    } catch (error) {
+      toast.error("Fail on Claim All");
+      return
+    }
+
   }
 
   const handleConnectDiscord = async () => {
@@ -273,26 +375,84 @@ const AuctionProfile = () => {
             </div>
           </div>
         </div>
+        {/* { anchorWallet?.publicKey.toString() === walletAddress && <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={handleAllTab}
+              className={`${isAllTab
+                ? "border border-white rounded-[0.7rem] bg-[#46464680]  text-[#9B9B9B] py-3 px-7"
+                : "  bg-black  text-white py-3 px-7"
+                }`}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              onClick={handleUnclaimedTab}
+              className={`${isUnclaimedTab
+                ? "border border-white rounded-[0.7rem] bg-[#46464680]  text-[#9B9B9B] py-3 px-7"
+                : " bg-black  text-white py-3 px-7"
+                }`}
+            >
+              Unclaimed
+            </button>
+         </div>} */}
       </div>
 
       {
-        participantLists.length > 0 ?
+        isAllTab && (participantLists.length > 0 ?
           participantLists.map((item: any, idx: any) =>
-            <AuctionRarticipant item={item} idx={idx} key={idx} />
-          )
-          :
-          isLoading ? <></>
+              <AuctionRarticipant item={item} idx={idx} key={idx} />
+            )
             :
-            <div className="max-w-[1280px] m-auto px-4">
-              <div className="bg-white rounded-md py-8 px-8 flex items-center">
-                <img src={infoIconBlack} alt="infoIconBlack" />
-                <h1 className="xl:text-[3.2rem] lg:text-[2.5rem] md:text-[1.8rem] ml-10">
-                { anchorWallet?.publicKey.toString() === walletAddress ? "You havn’t participated in any Auctions!" : "This wallet hasn’t participated in any Auctions!" }
-                </h1>
+            isLoading ? <></>
+              :
+              <div className="max-w-[1280px] m-auto px-4">
+                <div className="bg-white rounded-md py-8 px-8 flex items-center">
+                  <img src={infoIconBlack} alt="infoIconBlack" />
+                  <h1 className="xl:text-[3.2rem] lg:text-[2.5rem] md:text-[1.8rem] ml-10">
+                  { anchorWallet ? (anchorWallet?.publicKey.toString() === walletAddress ? "You havn’t participated in any Auctions!" : "This wallet hasn’t participated in any Auctions!") : "Please login with your wallet!" }
+                  </h1>
+                </div>
               </div>
-            </div>
+              )
       }
 
+      {
+        isUnclaimedTab && <>
+            <div className="flex items-center justify-end max-w-[1360px] m-auto px-4 py-4">
+              <span className="text-[#FFFFFF]">Claimable Token Amount: {claimableTokenAmount}</span>
+              <button
+                type="button"
+                className="py-3 px-4 bg-white rounded-md flex items-center ml-5 justify-end mr-20"
+                onClick={handleCliamAll}
+              >
+                <span>Claim All</span>
+              </button>
+              </div>
+              {
+              (unclaimedLists.length > 0 ?
+                unclaimedLists.map((item: any, idx: any) =>
+                    <>
+                        <AuctionRarticipant item={item} idx={idx} key={idx} />
+                    </>
+                  )
+                  :
+                  isLoading ? <></>
+                    :
+                    <div className="max-w-[1280px] m-auto px-4">
+                      <div className="bg-white rounded-md py-8 px-8 flex items-center">
+                        <img src={infoIconBlack} alt="infoIconBlack" />
+                        <h1 className="xl:text-[3.2rem] lg:text-[2.5rem] md:text-[1.8rem] ml-10">
+                        { anchorWallet ? (anchorWallet?.publicKey.toString() === walletAddress ? "There is no unclaimed bid" : "This wallet hasn’t participated in any Auctions!") : "Please login with your wallet" }
+                        </h1>
+                      </div>
+                    </div>
+                    )
+              }
+        </>
+      }
+      <ToastContainer />
     </>
   );
 };

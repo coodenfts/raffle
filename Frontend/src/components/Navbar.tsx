@@ -48,7 +48,7 @@ const Navbar: React.FC = () => {
           }
           {
 
-            anchorWallet?.publicKey.toBase58() !== CONFIG.ADMIN_WALLET && <li>
+            anchorWallet && anchorWallet?.publicKey.toBase58() !== CONFIG.ADMIN_WALLET && <li>
               <Link
                 to={`/profile/raffle/${anchorWallet?.publicKey.toBase58()}`}
                 className="text-white text-base font-archia hover:opacity-95 transition-all"

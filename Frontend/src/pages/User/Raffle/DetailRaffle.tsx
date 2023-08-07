@@ -17,6 +17,7 @@ import {
   VerifyCollection,
   buyTicketsForRaffle,
   claimPrizeForRaffle,
+  claimCoodeForAdmin
 } from "../../../services/contracts/raffle";
 import { getRaffleById } from "../../../services/api";
 import ReturnIcon from "../../../assets/return-icon.png";
@@ -28,11 +29,13 @@ import UnionIcons from "../../../assets/Union-icons.png";
 import TimingIcon from "../../../assets/Subtract-timing-icon.png";
 import TicketIcon from "../../../assets/Subtract-ticket-icon.png";
 import DateIcon from "../../../assets/Subtract.-date-icon.png";
-import { connection } from "../../../utils";
+import { connection, delay } from "../../../utils";
 import commonService from "../../../services/common.service";
 import { prettyNumber } from "../../../utils";
+import FilterRaffles from "../../Admin/Raffle/FilterRaffle";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
-const { RAFFLE, API_URL } = CONFIG;
+const { RAFFLE, API_URL, ADMIN_WALLET } = CONFIG;
 
 const UserDetailRaffle = () => {
   const { id } = useParams();
@@ -47,6 +50,7 @@ const UserDetailRaffle = () => {
   const [isWinner, setWinner] = useState(false)
   const [ticketBuyerLists, setTicketBuyerLists] = useState<any>([])
   const [remainTickets, setRemainTickets] = useState(0)
+  const [myTickets, setMyTickets] = useState(0)
   const [buyTicketStatus, setBuyTicketStatus] = useState({
     status: false,
     lists: []
@@ -55,7 +59,10 @@ const UserDetailRaffle = () => {
     winner: false,
     prized: false
   })
-  const [floorPrice, setFloorPrice] = useState(0)
+  const [floorPrice, setFloorPrice] = useState('')
+  const [winnerWalletAddress, setWinnerWalletAddress] = useState('')
+  const [winnerTicket, setWinnerTicket] = useState(0)
+  const currentTime = Math.floor(Date.now() / 1000);
 
   let startCountdownApi: CountdownApi | null = null
   let countdownEndApi: CountdownApi | null = null
@@ -144,11 +151,10 @@ const UserDetailRaffle = () => {
         return
       }
       setLoading(true);
-
       const res = await buyTicketsForRaffle(anchorWallet, nftInfo, amount, buyTicketStatus.lists);
       const _amount = Number(amount)
       if (res) {
-        toast("Success on buying tickets");
+        toast.success("Success on buying tickets");
         setBuyerInfo({
           ...buyerInfo,
           purchasedTicket: buyerInfo?.purchasedTicket
@@ -163,6 +169,7 @@ const UserDetailRaffle = () => {
           count: nftInfo.count + _amount
         });
         setRemainTickets(remainTickets - _amount)
+        setMyTickets(buyerInfo?.purchasedTicket + _amount)
         setOwnerBiddingStatus(true)
         // change amount or push field
         const finditem = ticketBuyerLists.find((item: any) =>
@@ -202,7 +209,8 @@ const UserDetailRaffle = () => {
       setLoading(true);
       const res = await claimPrizeForRaffle(anchorWallet, nftInfo);
       if (res) {
-        toast("Success on claiming prize");
+        toast.success("Success on claiming prize");
+        setRaffleStatus(2)
         setWinnerPrized({
           ...winnerPrized,
           prized: true
@@ -218,8 +226,35 @@ const UserDetailRaffle = () => {
     }
   };
 
+  const handleClaimCoode = async () => {
+    try {
+      setLoading(true);
+      const res = await claimCoodeForAdmin(anchorWallet, nftInfo);
+      if (res) {
+        toast.success("Success on claiming coode");
+        setWinnerPrized({
+          ...winnerPrized,
+          prized: true
+        })
+      } else {
+        toast.error("Fail on claiming coode");
+      }
+      setLoading(false);
+    } catch (error) {
+
+      setLoading(false);
+      toast.error("Fail on claiming coode");
+    }
+  };
+
   const getUserInfo = async (buyers: any[]) => {
     const filterBuyerLists = buyers.filter((item: any) => item.purchasedTicket > 0)
+    const winnerInfo = buyers.find((item: any) => item.purchasedTicket >0 && item.isWinner === 1)
+    if(winnerInfo){
+      setWinnerWalletAddress(winnerInfo.buyer.toString())
+      setWinnerTicket(winnerInfo.purchasedTicket) 
+    }
+
     const get_user: any = await commonService({
       method: `get`,
       route: `${API_URL}/user/${anchorWallet?.publicKey.toBase58()}`
@@ -259,17 +294,28 @@ const UserDetailRaffle = () => {
   };
 
   const getRaffleStatus = async (poolData: any) => {
-    const currentTime = Math.floor(Date.now() / 1000);
     let status = 0;
 
-    if (currentTime > poolData.endTime) {
+    if (currentTime + 90 > poolData.endTime) {
       status = 2
     } else if (currentTime > poolData.startTime) {
       status = 1
     }
     setRaffleStatus(status);
+  
 
-    if (poolData.state === 1) {
+    if (poolData?.state === 1) {
+
+        try {
+          const claim_status = poolData?.buyers.find((item: any) => item?.isWinner === 1)
+
+        } catch (error) {
+          console.log('error', error)
+        }
+
+     
+
+
       setWinnerPrized({
         ...winnerPrized,
         winner: true,
@@ -288,7 +334,6 @@ const UserDetailRaffle = () => {
   useEffect(() => {
     (async () => {
       try {
-        console.log('123')
         if (!anchorWallet) return
         const nftInfoById: any = await getRaffleById(id);
 
@@ -305,7 +350,9 @@ const UserDetailRaffle = () => {
           provider
         );
 
+        
         const verifyCollection: any = await VerifyCollection(anchorWallet?.publicKey.toBase58(), connection)
+        
         if (verifyCollection?.status) {
           setBuyTicketStatus({
             status: true,
@@ -320,6 +367,7 @@ const UserDetailRaffle = () => {
         }
 
         const raffleId = new anchor.BN(nftInfoById.id);
+        
         const [pool] = await PublicKey.findProgramAddress(
           [
             Buffer.from(RAFFLE.POOL_SEED),
@@ -330,6 +378,7 @@ const UserDetailRaffle = () => {
         );
 
         try {
+          
           const poolData: any = await program.account.pool.fetch(pool);
           setRemainTickets(poolData?.totalTicket - poolData?.purchasedTicket)
           getUserInfo(poolData.buyers);
@@ -342,19 +391,17 @@ const UserDetailRaffle = () => {
         setInterval(async () => {
           if (anchorWallet) {
             const poolData: any = await program.account.pool.fetch(pool);
-            const claim_status = poolData.buyers.find((item: any) => item?.isWinner === 1 &&
-              item.buyer.toString() === anchorWallet.publicKey.toString()
-            )
-            if (claim_status?.buyer.toBase58() === anchorWallet.publicKey.toBase58()  ) {
-              setWinner(true)
-            } else {
-              setWinner(false)
-            }
-            // getRaffleStatus(poolData);
+            // if (claim_status?.buyer.toBase58() === anchorWallet.publicKey.toBase58()  ) {
+            //   setWinner(true)
+            // } else {
+            //   setWinner(false)
+            // }
+            setRemainTickets(poolData?.totalTicket - poolData?.purchasedTicket)
+            getUserInfo(poolData.buyers);
+            getRaffleStatus(poolData);
           }
 
         }, 7000);
-
 
         startCountdownApi?.start()
         countdownEndApi?.start()
@@ -371,11 +418,11 @@ const UserDetailRaffle = () => {
       async() => {
       
         try {
-          setLoading(true);
+          // setLoading(true);
       
         const nftInfoById: any = await getRaffleById(id);
         document.title = `Coode | Raffle | ${nftInfoById?.tokenName}`;
-        setFloorPrice(nftInfoById?.floorPrice || 0);
+        setFloorPrice(nftInfoById?.floor_price || '_');
         const provider = new anchor.AnchorProvider(connection, anchorWallet!, {
           skipPreflight: true,
           preflightCommitment: "confirmed" as Commitment,
@@ -398,13 +445,21 @@ const UserDetailRaffle = () => {
         );
 
         const poolData: any = await program.account.pool.fetch(pool);
-        const dateFormat = new Date(nftInfoById.start_date * 1000)
-        const result_date = dateFormat.getDate() +
-          "/" + (dateFormat.getMonth() + 1) +
-          "/" + dateFormat.getFullYear() +
-          " " + dateFormat.getHours() +
-          ":" + dateFormat.getMinutes() +
-          ":" + dateFormat.getSeconds()
+        const startDateFormat = new Date(nftInfoById.start_date * 1000)
+        const start_date = startDateFormat.getDate() +
+          "/" + (startDateFormat.getMonth() + 1) +
+          "/" + startDateFormat.getFullYear() +
+          " " + startDateFormat.getHours() +
+          ":" + startDateFormat.getMinutes() +
+          ":" + startDateFormat.getSeconds()
+
+        const endDateFormat = new Date(nftInfoById.end_date * 1000)
+        const end_date = endDateFormat.getDate() +
+          "/" + (endDateFormat.getMonth() + 1) +
+          "/" + endDateFormat.getFullYear() +
+          " " + endDateFormat.getHours() +
+          ":" + endDateFormat.getMinutes() +
+          ":" + endDateFormat.getSeconds()
           
           console.log('poolData============', poolData)
           setNftInfo({
@@ -414,10 +469,11 @@ const UserDetailRaffle = () => {
           count: poolData.count,
           purchasedTicket: poolData?.purchasedTicket ? poolData?.purchasedTicket : 0,
           total_tickets: poolData?.totalTicket,
-          start: result_date,
+          start: start_date,
+          end: end_date,
           end_date: poolData?.endTime
         });
-        setLoading(false)
+        // setLoading(false)
 
         } catch (error) {
           
@@ -433,10 +489,12 @@ const UserDetailRaffle = () => {
   }
 
   const handleEndComplete = () => {
-    if (Date.now() > nftInfo.end_date * 1000) {
+    if (currentTime + 90 > nftInfo.end_date) {
       setRaffleStatus(2)
     }
   }
+
+  console.log('raffleStatus', raffleStatus)
 
   return (
     <div>
@@ -486,7 +544,7 @@ const UserDetailRaffle = () => {
                   </div>
                 </div>
               </div>
-              <div className="mt-5">
+              <div className="mt-5 flex items-cetner justify-center">
                 <button
                   type="button"
                   className="text-black bg-white rounded-[0.7rem] flex items-center py-3 px-5"
@@ -502,81 +560,103 @@ const UserDetailRaffle = () => {
                 </button>
               </div>
               <div className="mt-5">
-                <div className="flex items-center justify-between">
-                  <input
-                    type="number"
-                    name="solValue"
-                    value={amount}
-                    min={0}
-                    placeholder="0"
-                    onChange={(e) => setAmount(prettyNumber(e.target.value))}
-                    className="w-[38%] block text-white text-base text-center outline-none bg-[#82828240] border border-[#606060] rounded-[0.7rem] py-3 px-5"
-                    disabled={raffleStatus !== 1}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleBuyTicket}
-                    className={`basis-[38%]  text-black bg-white rounded-[0.7rem]  py-3 sm:px-5 ${buyTicketStatus.status ? `opacity-100 cursor-pointer ` : `opacity-80 cursor-no-drop `} `}
-                  >
-                    <span className="sm:text-lg text-sm text-black">
-                      Buy Ticket(s)
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="text-black bg-white rounded-[0.7rem] flex items-center justify-center py-3 px-5"
-                  >
-                    <img
-                      src={ShareIcon}
-                      alt="Pricetag-icon"
-                      className="w-[22px]"
-                    />
-                  </button>
-                </div>
+                { !anchorWallet && <div className="flex items-cetner justify-center">
+                  <WalletMultiButton startIcon={undefined} />
+                </div> }
+                { anchorWallet && <>
+                { isLoading ? <></> : 
+                  <div className="text-center mt-5">
+                      <div className="flex items-center justify-between">
+                        <input
+                          type="number"
+                          name="solValue"
+                          value={amount}
+                          min={0}
+                          placeholder="0"
+                          onChange={(e) => setAmount(prettyNumber(e.target.value))}
+                          className="w-[48%] block text-white text-base text-center outline-none bg-[#82828240] border border-[#606060] rounded-[0.7rem] py-3 px-5"
+                          disabled={raffleStatus !== 1}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleBuyTicket}
+                          className={`basis-[48%]  text-black bg-white rounded-[0.7rem]  py-3 sm:px-5 ${raffleStatus === 2 || raffleStatus === 1 && remainTickets === 0 ? ` opacity-80 cursor-no-drop ` : ` opacity-100 cursor-pointer `} `}
+                        >
+                          <span className="sm:text-lg text-sm text-black">
+                            Buy Ticket(s)
+                          </span>
+                        </button>
+                        {/* <button
+                          type="button"
+                          className="text-black bg-white rounded-[0.7rem] flex items-center justify-center py-3 px-5"
+                        >
+                          <img
+                            src={ShareIcon}
+                            alt="Pricetag-icon"
+                            className="w-[22px]"
+                          />
+                        </button> */}
+                      </div>
+                    {/* <h1 className="text-3xl text-[#15BFFD] bold text-center mt-10 mb-9" style={{ textShadow: '0px 8px 56px rgba(21, 191, 253, 0.5), 0px 6px 4px rgba(21, 191, 253, 0.18)' }}>Raffle Info</h1> */}
+                    {/* {
+                      raffleStatus === 0 ?
+                        <p className="text-white text-[1.25rem]">None</p> :
+                        raffleStatus === 1 ?
+                          <p className="text-white text-[1.25rem]">Pending</p> :
+                          isWinner ?
+                            <p className="text-white text-[1.25rem]">Win</p> :
+                            <p className="text-white text-[1.25rem]">Fail</p>
+                    } */}
+                    {/* {
+                      !isLoading && raffleStatus === 0 && <p className="text-white text-[1.25rem]">None</p>
+                    } */}
+                    {/* {
+                      (raffleStatus === 1 && remainTickets === 0) &&  <p className="text-white text-[1.25rem]">Pending</p>
+                    } */}
+                    {
+                      (raffleStatus === 1 && remainTickets === 0 && winnerWalletAddress === '') &&  <p className="text-white text-[1.25rem]">Waiting</p>
+                    }
+                   {
+                    (raffleStatus === 2 || raffleStatus === 1 && remainTickets === 0) && <>
+                      <div className="flex items-center justify-between mt-5">
+                        <div className="text-white" style={{ 
+                          padding: "20px",
+                          width:  "100%",
+                          border: "3px solid orange", 
+                          borderRadius: "10px"
+                        }}>
+                          <p className="text-[orange]">Raffle Winner!</p>
+                          <h1 style={{fontSize: "26px", fontWeight: "bold"}}>
+                              { winnerWalletAddress !=='' && winnerWalletAddress === anchorWallet?.publicKey.toString() && `You win!`}
+                              { winnerWalletAddress !=='' && winnerWalletAddress !== anchorWallet?.publicKey.toString() && <Link to={`/profile/raffle/${winnerWalletAddress}`}>{winnerWalletAddress.substr(0, 6)}...{winnerWalletAddress.substr(winnerWalletAddress.length - 4, 4)}</Link>}
+                              { winnerWalletAddress === '' && `No winner`}
 
-                <div className="text-center mt-5">
-                  {/* <h1 className="text-3xl text-[#15BFFD] bold text-center mt-10 mb-9" style={{ textShadow: '0px 8px 56px rgba(21, 191, 253, 0.5), 0px 6px 4px rgba(21, 191, 253, 0.18)' }}>Raffle Info</h1> */}
-                  {/* {
-                    raffleStatus === 0 ?
-                      <p className="text-white text-[1.25rem]">None</p> :
-                      raffleStatus === 1 ?
-                        <p className="text-white text-[1.25rem]">Pending</p> :
-                        isWinner ?
-                          <p className="text-white text-[1.25rem]">Win</p> :
-                          <p className="text-white text-[1.25rem]">Fail</p>
-                  } */}
-                  {
-                    !isLoading && raffleStatus === 0 && <p className="text-white text-[1.25rem]">None</p>
+                          </h1>
+                          { winnerWalletAddress !=='' && winnerWalletAddress === anchorWallet?.publicKey.toString() && !winnerPrized.prized && <div className="btn-gradient rounded-full p-[1px]">
+                            <div className="btn-background-absolute rounded-full">
+                              <p className={`text-[1.25rem] text-center py-2 px-8 block text-[#15BFFD] m-0 ${!winnerPrized.prized ? 'cursor-pointer' : 'cursor-no-drop'}`}
+                                onClick={handleClaimPrize}
+                              >
+                                Claim Prize
+                              </p>
+                            </div>
+                          </div>}
+                          { winnerWalletAddress !== '' && <p className="text-[orange]">Won with {winnerTicket} ticket(s)</p>}
+                        </div>
+                      </div>
+                    </>
                   }
-                  {
-                    raffleStatus === 1 && <p className="text-white text-[1.25rem]">Pending</p>
-                  }
-                  {
-                    raffleStatus === 2 &&
-                    (ownerBiddingStatus ?
-                      isWinner ?
-                        <p className="text-white text-[1.25rem]">Win</p>
-                        :
-                        <p className="text-white text-[1.25rem]">Fail</p>
-                      :
-                      <p className="text-white text-[1.25rem]">None</p>)
-                  }
-
-
-                </div>
-
-                {
-                  isWinner &&
-                  <div className="btn-gradient rounded-full p-[1px] mb-3">
+                  {/* { anchorWallet?.publicKey.toString() === ADMIN_WALLET && <div className="btn-gradient rounded-full p-[1px] mb-3">
                     <div className="btn-background-absolute rounded-full">
-                      <p className={`text-[1.25rem] text-center py-2 px-8 block text-[#15BFFD] m-0 ${!winnerPrized.prized ? 'cursor-pointer' : 'cursor-no-drop'}`}
-                        onClick={handleClaimPrize}
+                      <p className={`text-[1.25rem] text-center py-2 px-8 block text-[#15BFFD] m-0 cursor-pointer`}
+                        onClick={handleClaimCoode}
                       >
-                        Claim Prize
+                        Claim Coode
                       </p>
                     </div>
-                  </div>
-                }
+                  </div>} */}
+                </div>}
+                </>}
               </div>
             </div>
 
@@ -592,11 +672,12 @@ const UserDetailRaffle = () => {
                         alt="VerificationIcon"
                         className="w-[20px]"
                       />
-                      <p className="text-white">{nftInfo.tokenName}</p>
+                      &nbsp;
+                      <p className="text-white">{nftInfo.collectionName || `Verified Collecion`}</p>
                     </div>
                     <h1 className="text-3xl text-white mt-1">{nftInfo.tokenName}</h1>
                     <p className="text-[#A0A0A0] text-lg">
-                      Total Ticket Value:
+                      Total Ticket Value:&nbsp;
                       {buyerInfo ? Number(nftInfo.price * nftInfo.purchasedTicket).toFixed(2) : 0} $COODE
                     </p>
                     <div className="flex items-center mt-4">
@@ -625,20 +706,22 @@ const UserDetailRaffle = () => {
                   </div>
                   <div>
                     <Link to='/' >
-
-                      <div className="flex items-center mb-2">
+                      <button
+                        type="button"
+                        className="text-black bg-white rounded-[0.7rem] flex items-center py-3 px-5"
+                      >
                         <img src={ReturnIcon} alt="ReturnIcon" />
-                        <span className="text-white inline-block ml-1">
+                        <span className="text-black inline-block ml-1">
                           Return
                         </span>
-                      </div>
+                      </button>
                     </Link>
-                    <div className="flex items-center">
+                    {/* <div className="flex items-center">
                       <img src={ReportIcon} alt="ReportIcon" />
                       <span className="text-[#AA0000] inline-block ml-1">
                         Report
                       </span>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
                 <div className="h-[2px] w-[95%] m-auto bg-[#606060]"></div>
@@ -672,7 +755,9 @@ const UserDetailRaffle = () => {
                           className="max-w-[60px] m-auto"
                         />
                         <p className="text-[#878787]">Tickets Remaining</p>
-                        <p className="text-white">{remainTickets}/{nftInfo.total_tickets}</p>
+                        <p className="text-white">
+                            {remainTickets === 0 ? 'SOLD OUT' : `${remainTickets}/${nftInfo.total_tickets}` }
+                          </p>
                       </div>
                       <div className="text-center">
                         <img
@@ -693,6 +778,26 @@ const UserDetailRaffle = () => {
                         />
                         <p className="text-[#878787]">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Floor Price&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</p>
                         <p className="text-white">{floorPrice}</p>
+                      </div>
+                      <div className="text-center md:px-10 px-6 py-4 sm:py-0 my-4 sm:my-0 sm:border-r sm:border-l border-dashed">
+                        <img
+                          src={TicketIcon}
+                          alt="TimingIcon"
+                          className="max-w-[60px] m-auto"
+                        />
+                        <p className="text-[#878787]">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;My Tickets&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</p>
+                        { anchorWallet ? <p className="text-white">
+                          {buyerInfo ? buyerInfo.purchasedTicket : 0}
+                        </p> : <p className="text-white">_</p>}
+                      </div>
+                      <div className="text-center">
+                        <img
+                          src={DateIcon}
+                          alt="TimingIcon"
+                          className="max-w-[60px] m-auto"
+                        />
+                        <p className="text-[#878787]">End Date</p>
+                        <p className="text-white">{nftInfo?.end}</p>
                       </div>
                     </div>
                   </div>
@@ -726,11 +831,9 @@ const UserDetailRaffle = () => {
                 )}
                 <div className="p-4">
                   <h1 className="text-2xl text-white">Terms & Conditions</h1>
-                  <ul className="text-white mt-2 text-base list-decimal px-5">
-                    <li>
-                      {nftInfo.description}
-                    </li>
-                  </ul>
+                  <div className="text-white mt-2 text-base list-decimal px-5">
+                    <pre>{nftInfo.description}</pre>
+                  </div>
                 </div>
               </div>
 

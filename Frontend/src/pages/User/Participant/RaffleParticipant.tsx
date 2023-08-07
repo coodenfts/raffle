@@ -73,12 +73,13 @@ const RaffleRarticipant = (props: any) => {
     )
   }
 
-
+  console.log('winnerWalletAddress', item.winnerWalletAddress)
 
   return (
     <div key={idx} >
       <div className="max-w-[1280px] m-auto px-4">
-        <div className="border-2 border-white bg-[#606060A6] rounded-md mb-4">
+        <div className={` border-2 ${ item.winnerWalletAddress ? 'border-[orange]' : 'border-[white]' } bg-[#606060A6] rounded-md mb-4
+        `}>
           <div className="flex p-4">
             <div className="flex basis-[30%]">
               <div className="mr-2">

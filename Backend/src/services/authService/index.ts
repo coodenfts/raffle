@@ -9,6 +9,7 @@ const { AUCTION, RAFFLE, SIGN_KEY } = CONFIG;
 const verify = async (address: string, signature: string, type: number): Promise<boolean> => {
   try {
     console.log('address', address, 'signature', signature);
+    console.log('address type', typeof address);
     let message = ''
     if (type === 0) message = AUCTION.message;
     else if (type === 1) message = RAFFLE.message;

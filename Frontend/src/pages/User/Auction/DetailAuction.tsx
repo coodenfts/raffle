@@ -38,7 +38,8 @@ import { getAssociatedTokenAddress } from "@solana/spl-token";
 import commonService from "../../../services/common.service";
 import { VerifyCollection } from "../../../services/contracts/raffle";
 import { updateAuction } from "../../../services/api";
-import {getSignedMessage } from "../../../utils";
+import {delay, getSignedMessage } from "../../../utils";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
 
 const { CLUSTER_API, AUCTION, TokenAddress, DECIMAL, API_URL } =
@@ -69,7 +70,14 @@ const DetailUserAuction = () => {
   const [auctionClaimPrized, setAuctionClaimPrized] = useState(false)
   const [ownNfts, setOwnNfts] = useState<any>([])
   const [totalBidCount, setTotalBidCount] = useState(0)
-  const [floorPrice, setFloorPrice] = useState(0)
+  const [floorPrice, setFloorPrice] = useState('')
+  const [winnerWalletAddress, setWinnerWalletAddress] = useState("")
+  const [winnerPrice, setwinnerPrice] = useState(0)
+  const [winner, setWinner] = useState(false)
+  const [minBidAmount, setMinBidAmount] = useState(0)
+  const [minBidIncrement, setMinBidIncrement] = useState(0)
+  const [topBidAmount, setTopBidAmount] = useState(0)
+  const currentTime = Math.floor(Date.now() / 1000);
 
   let startCountdownApi: CountdownApi | null = null
   let countdownEndApi: CountdownApi | null = null
@@ -130,7 +138,6 @@ const DetailUserAuction = () => {
 
   const handleCreateOrUpdateBid = async () => {
     try {
-      console.log('===========balance', balance)
       if (!balance) {
         toast.error(`No tokens in your wallet.`)
         return
@@ -148,8 +155,8 @@ const DetailUserAuction = () => {
         return
       }
 
-      if (amount < nftInfo.min_bid_amount || balance < nftInfo.min_bid_amount) {
-        toast.error(`Bidding Or Owned Token amount must be bigger than Min.Increment`)
+      if (amount < minBidAmount + minBidIncrement || balance < minBidAmount + minBidIncrement) {
+        toast.error(`Bidding Or Owned Token amount must be bigger than Min.Bid Amount + Min.Bid Increment`)
         return
       }
 
@@ -164,7 +171,7 @@ const DetailUserAuction = () => {
         );
 
         if (updateRes) {
-          toast("Success on updating bid");
+          toast.success("Success on updating bid");
           setCurrentBid(amount)
 
           setBalance(balance + (price - bidInfo.amount / DECIMAL));
@@ -178,7 +185,7 @@ const DetailUserAuction = () => {
           setTicketBuyerLists(new_buyerLists)
 
         } else {
-          toast("Fail on updating bid");
+          toast.error("Fail on updating bid");
         }
       } else {
 
@@ -189,7 +196,7 @@ const DetailUserAuction = () => {
           ownNfts.lists.length
         );
         if (createRes) {
-          toast("Success on creating bid");
+          toast.success("Success on creating bid");
           setBiddingStatus(1);
           setBalance(balance - price);
           setCurrentBid(amount)
@@ -200,13 +207,13 @@ const DetailUserAuction = () => {
             isWinner: 0
           }])
         } else {
-          toast("Fail on creating bid");
+          toast.error("Fail on creating bid");
         }
       }
       setLoading(false);
     } catch (error) {
-      if (biddingStatus === 1) toast("Fail on updating bid");
-      else toast("Fail on creating bid");
+      if (biddingStatus === 1) toast.error("Fail on updating bid");
+      else toast.error("Fail on creating bid");
       setLoading(false);
     }
   };
@@ -217,7 +224,7 @@ const DetailUserAuction = () => {
       setLoading(true);
       const res = await cancelBidForAuction(anchorWallet, nftInfo);
       if (res) {
-        toast("Success on canceling bid");
+        toast.success("Success on canceling bid");
         setBiddingStatus(0);
         setBalance(balance + bidInfo.price.toNumber() / DECIMAL);
         const findIdx = ticketBuyerLists.findIndex((item: any) =>
@@ -232,13 +239,13 @@ const DetailUserAuction = () => {
         setTicketBuyerLists(final_buyerLists)
         setCurrentBid(0)
       } else {
-        toast("Fail on canceling bid");
+        toast.error("Fail on canceling bid");
       }
       setLoading(false);
     } catch (error) {
 
       setLoading(false);
-      toast("Fail on canceling bid");
+      toast.error("Fail on canceling bid");
     }
   };
 
@@ -251,7 +258,7 @@ const DetailUserAuction = () => {
       setLoading(true);
       const res = await claimPrize(anchorWallet, nftInfo);
       if (res) {
-        toast("Success on claiming prize");
+        toast.success("Success on claiming prize");
         setAuctionClaimPrized(true)
 
       // const payload: any = new FormData();
@@ -262,13 +269,13 @@ const DetailUserAuction = () => {
       // const res = await updateAuction(id, payload);
         
       } else {
-        toast("Fail on claiming prize");
+        toast.error("Fail on claiming prize");
       }
       setLoading(false);
     } catch (error) {
 
       setLoading(false);
-      toast("Fail on claiming prize");
+      toast.error("Fail on claiming prize");
     }
   };
 
@@ -282,22 +289,42 @@ const DetailUserAuction = () => {
       const res = await claimBid(anchorWallet, nftInfo);
       if (res) {
 
-        toast("Success on claiming bid");
+        toast.success("Success on claiming bid");
         setAutionClaimed(true)
       } else {
-        toast("Fail on claiming bid");
+        toast.error("Fail on claiming bid");
       }
       setLoading(false);
     } catch (error) {
 
       setLoading(false);
-      toast("Fail on claiming bid");
+      toast.error("Fail on claiming bid");
     }
   };
 
   const onChangeSol = (e: any) => {
     setAmount(e.target.value);
   };
+
+  const getTopBid = async (bids: any[], bidCount: any) => {
+    const filterBuyerLists: any = []
+    for (let i = 0; i < bids.length; i++) {
+      if (i < bidCount) {
+        filterBuyerLists.push(bids[i])
+      }
+    }
+
+    let winner_buyerLists = [];
+    for (let i = 0; i < filterBuyerLists.length; i++) {
+      winner_buyerLists.push(filterBuyerLists[i].price.toNumber())
+    }
+    let high = 0;
+    if(winner_buyerLists.length > 0){
+      high = Math.max.apply(Math, winner_buyerLists);
+      return high / DECIMAL
+    } else 
+      return 0
+  }
 
   const getUserInfo = async (bids: any[], bidCount: any) => {
     const filterBuyerLists: any = []
@@ -311,8 +338,19 @@ const DetailUserAuction = () => {
     for (let i = 0; i < filterBuyerLists.length; i++) {
       winner_buyerLists.push(filterBuyerLists[i].price.toNumber())
     }
-    const high = Math.max.apply(Math, winner_buyerLists);
+    let high = 0;
+    if(winner_buyerLists.length > 0){
+      high = Math.max.apply(Math, winner_buyerLists);
+      setTopBidAmount(high / DECIMAL)
+    }
+   
     const result: any = filterBuyerLists.find((item: any) => item.price.toNumber() === high)
+   
+    if(result) {
+      setWinnerWalletAddress(result?.bidder?.toString())
+      setwinnerPrice(result?.price?.toNumber() / DECIMAL)
+    }
+
     if (result?.bidder?.toString() === anchorWallet?.publicKey?.toString()) {
       setAuctionWinner(true)
     } else {
@@ -353,13 +391,13 @@ const DetailUserAuction = () => {
     });
 
     if (bid) {
-      setAmount(bid.price.toNumber() / DECIMAL);
+      // setAmount(bid.price.toNumber() / DECIMAL);
       setBiddingStatus(1);
       setBidInfo(bid);
     } else {
       setCurrentBid(0)
       setBiddingStatus(0);
-      setAmount(0)
+      // setAmount(0)
     }
   };
 
@@ -368,7 +406,16 @@ const DetailUserAuction = () => {
     let status = 0;
     if (currentTime > poolData.endTime) status = 2;
     else if (currentTime >= poolData.startTime) status = 1;
+    const _topBidAmount = await getTopBid(poolData?.bids, poolData?.count);
+    if(poolData.state === 1) {
+      setWinner(true)   
+    }
+  
+    setTopBidAmount(_topBidAmount)
     setAuctionStatus(status);
+    setTotalBidCount(poolData?.count)
+    setMinBidAmount(poolData.minPrice?.toNumber() / DECIMAL)
+    setMinBidIncrement(poolData.bidIncrement?.toNumber() / DECIMAL)
   };
 
   const handleAuctionComplete = async () => {
@@ -414,6 +461,7 @@ const DetailUserAuction = () => {
           setAuctionWinner(false)
         }
       }
+      await delay(3 * 60 * 10000)
       setAuctionStatus(2)
     } catch (error) {
 
@@ -427,7 +475,7 @@ const DetailUserAuction = () => {
         setLoading(true);
         const nftInfoById: any = await getAuctionById(id);
         document.title = `Coode | Raffle | ${nftInfoById?.tokenName}`;
-        setFloorPrice(nftInfoById?.floorPrice || 0)
+        setFloorPrice(nftInfoById?.floor_price.toString() || '')
         const provider = new anchor.AnchorProvider(connection, anchorWallet, {
           skipPreflight: true,
           preflightCommitment: "confirmed" as Commitment,
@@ -464,20 +512,27 @@ const DetailUserAuction = () => {
         }
 
         console.log('poolData',poolData)
+        getUserInfo(poolData?.bids, poolData?.count);
 
-        setTotalBidCount(poolData?.count)
         const poolData_filteredOwner = poolData?.bids.find((item: any) => item?.bidder?.toString() === anchorWallet?.publicKey?.toString());
         setCurrentBid(Number(poolData_filteredOwner?.price) / DECIMAL)
         if (poolData_filteredOwner?.claimed === 1) {
           setAutionClaimed(true)
         }
-        console.log('poolData',poolData)
         if (poolData?.state === 2) {
           setAuctionClaimPrized(true)
         }
 
         getUserInfo(poolData?.bids, poolData?.count);
         getAuctionStatus(poolData);
+
+        setInterval(async () => {
+          if (anchorWallet) {
+            const poolData: any = await program.account.pool.fetch(pool);
+            getAuctionStatus(poolData);
+          }
+
+        }, 7000);
 
         startCountdownApi?.start()
         countdownEndApi?.start()
@@ -494,23 +549,29 @@ const DetailUserAuction = () => {
   useEffect(()=>{
     (
       async() => {
-        setLoading(true);
         const nftInfoById: any = await getAuctionById(id);
 
-        const dateFormat = new Date(nftInfoById.start_date * 1000)
-        const result_date = dateFormat.getDate() +
-          "/" + (dateFormat.getMonth() + 1) +
-          "/" + dateFormat.getFullYear() +
-          " " + dateFormat.getHours() +
-          ":" + dateFormat.getMinutes() +
-          ":" + dateFormat.getSeconds()
+        const startDateFormat = new Date(nftInfoById.start_date * 1000)
+        const start_date = startDateFormat.getDate() +
+          "/" + (startDateFormat.getMonth() + 1) +
+          "/" + startDateFormat.getFullYear() +
+          " " + startDateFormat.getHours() +
+          ":" + startDateFormat.getMinutes() +
+          ":" + startDateFormat.getSeconds()
+          
+        const endDateFormat = new Date(nftInfoById.end_date * 1000)
+        const end_date = endDateFormat.getDate() +
+          "/" + (endDateFormat.getMonth() + 1) +
+          "/" + endDateFormat.getFullYear() +
+          " " + endDateFormat.getHours() +
+          ":" + endDateFormat.getMinutes() +
+          ":" + endDateFormat.getSeconds()
         
         setNftInfo({
           ...nftInfoById,
-          start: result_date
+          start: start_date,
+          end: end_date
         });
-
-        setLoading(false)
       }
     )()
   },[])
@@ -533,7 +594,7 @@ const DetailUserAuction = () => {
 
   }, [anchorWallet])
 
-  console.log('tikcerBuyerLists', ticketBuyerLists)
+  console.log('biddingStatus', biddingStatus)
 
   return (
     <>
@@ -590,20 +651,31 @@ const DetailUserAuction = () => {
                     value={amount}
                     min={0}
                     onChange={onChangeSol}
-                    className="w-[38%] block text-white text-base text-center outline-none bg-[#82828240] border border-[#606060] rounded-[0.7rem] py-3 px-5"
+                    className="w-[48%] block text-white text-base text-center outline-none bg-[#82828240] border border-[#606060] rounded-[0.7rem] py-3 px-5"
                     disabled={auctionStatus !== 1}
                   />
-
                   <button
                     type="button"
-                    className="basis-[38%]  text-black bg-white rounded-[0.7rem]  py-3 sm:px-5"
+                    className="basis-[48%]  text-black bg-white rounded-[0.7rem]  py-3 sm:px-5"
                     onClick={handleCreateOrUpdateBid}
                   >
                     <span className={` ${auctionStatus === 1 ? 'cursor-pointer' : 'cursor-no-drop'} max-w-fit mx-[auto] my-0 sm:text-lg text-sm text-black`}>
                       {biddingStatus === 1 ? 'Update Bid' : 'Create Bid'}
                     </span>
                   </button>
-                  <button
+                  {/* { biddingStatus === 1 &&
+                  auctionStatus === 2 &&
+                  !auctionWinner  && <button
+                    type="button"
+                    className="basis-[48%]  text-black bg-white rounded-[0.7rem]  py-3 sm:px-5"
+                    onClick={handleClaimBid}
+                  >
+                    <span className={`max-w-fit mx-[auto] my-0 sm:text-lg text-sm text-black ${auctionClaimed ? 'cursor-no-drop' : 'cursor-pointer'}`}>
+                      Claim Bid
+                    </span>
+                  </button>} */}
+                  
+                  {/* <button
                     type="button"
                     className="text-black bg-white rounded-[0.7rem] flex items-center justify-center py-3 px-5"
                   >
@@ -612,81 +684,111 @@ const DetailUserAuction = () => {
                       alt="Pricetag-icon"
                       className="w-[22px]"
                     />
-                  </button>
+                  </button> */}
                 </div>
+                <div className="flex items-center justify-between mt-5">
+                  {/* { biddingStatus === 1 && <button
+                    type="button"
+                    className="basis-[48%]  text-black bg-white rounded-[0.7rem]  py-3 sm:px-5"
+                    onClick={handleCreateOrUpdateBid}
+                  >
+                    <span className={` ${auctionStatus === 1 ? 'cursor-pointer' : 'cursor-no-drop'} max-w-fit mx-[auto] my-0 sm:text-lg text-sm text-black`}>
+                      {biddingStatus === 1 ? 'Update Bid' : 'Create Bid'}
+                    </span>
+                  </button>} */}
 
-                {
-                  biddingStatus === 1 ?
-                    <div className="btn-gradient rounded-full p-[1px] mb-3">
-                      <div className="btn-background-absolute rounded-full">
-                        <p className={`text-[1.25rem] text-center py-2 px-8 block text-[#15BFFD] m-0  max-w-fit mx-[auto] my-0  ${auctionStatus === 1 ? 'cursor-pointer' : 'cursor-no-drop'}`}
-                          onClick={handleDeleteBid}
-                        >
-                          Cancel Bid
-                        </p>
+                  {/* { biddingStatus ===1 && <button
+                    type="button"
+                    className={`basis-[48%]  text-black bg-white rounded-[0.7rem]  py-3 sm:px-5 ${auctionStatus === 1 ? 'cursor-pointer' : 'cursor-no-drop'}`}
+                    onClick={handleDeleteBid}
+                  >
+                    <span className={` ${auctionStatus === 1 ? 'cursor-pointer' : 'cursor-no-drop'} max-w-fit mx-[auto] my-0 sm:text-lg text-sm text-black`}>
+                      Cancel Bid
+                    </span>
+                  </button>} */}
+
+                  {/* { biddingStatus === 1 &&
+                    auctionStatus === 2 &&
+                    auctionWinner  && <button
+                    type="button"
+                    className="basis-[48%]  text-black bg-white rounded-[0.7rem]  py-3 sm:px-5"
+                    onClick={handleClaimPrize}
+                  >
+                    <span className={`max-w-fit mx-[auto] my-0 sm:text-lg text-sm text-black ${auctionClaimPrized ? 'cursor-no-drop' : 'cursor-pointer'}`}>
+                      Claim Prize
+                    </span>
+                  </button>} */}
+                </div>   
+              </div>
+              
+              { !anchorWallet && <div className="flex items-cetner justify-center">
+                <WalletMultiButton startIcon={undefined} />
+              </div> }
+              { anchorWallet && <>{
+                  isLoading? <></> : <div className="text-center">
+                  <p className="text-white text-[1.25rem] mt-3">
+                    {/* {biddingStatus === 0 && 'None'} */}
+                    {biddingStatus === 1 && auctionStatus === 1 && 'Pending'}
+                    {/* {
+                      biddingStatus === 1 &&
+                      auctionStatus === 2 &&
+                      auctionWinner &&
+                      'Win'
+                    }
+                    {biddingStatus === 1 &&
+                      auctionStatus === 2 &&
+                      !auctionWinner &&
+                      'Fail'
+                    } */}
+                  </p>
+                  {  
+                    auctionStatus === 2 &&                 
+                    <div className="flex items-center justify-between">
+                      <div className="text-white" style={{ 
+                        padding: "20px",
+                        width:  "100%",
+                        border: "3px solid orange", 
+                        borderRadius: "10px"
+                      }}>
+                        <p className="text-[orange]">Auction Winner!</p>
+                        <h1 style={{fontSize: "26px", fontWeight: "bold"}}>
+                            { winnerWalletAddress !=='' && winnerWalletAddress === anchorWallet?.publicKey.toString() && `You win!`}
+                            { winnerWalletAddress !=='' && winnerWalletAddress !== anchorWallet?.publicKey.toString() && <Link to={`/profile/auction/${winnerWalletAddress}`}>{winnerWalletAddress.substr(0, 6)}...{winnerWalletAddress.substr(winnerWalletAddress.length - 4, 4)}</Link>}
+                            { winnerWalletAddress === '' && `No winner`}
+                        </h1>
+  
+                        {biddingStatus === 1 &&
+                         auctionStatus === 2 &&
+                        auctionWinner && 
+                        !auctionClaimPrized && 
+                        winner && 
+                        <div className="btn-gradient rounded-full p-[1px] mb-3">
+                            <div className="btn-background-absolute rounded-full">
+                              {
+                                <p className={`text-[1.25rem] text-center py-2 px-8 block text-[#1a9dfd] m-0
+                                  max-w-fit mx-[auto] my-[0]
+                                  ${auctionClaimPrized ? 'cursor-no-drop' : 'cursor-pointer'}
+                                  `
+                                }
+                                  onClick={handleClaimPrize}
+                                >
+                                  Claim Prize
+                                </p>
+                              }
+                            </div>
+                          </div>
+                        } 
+                        { winnerWalletAddress !== '' && <p className="text-[orange]">Won with {winnerPrice} ticket(s)</p>}
                       </div>
-                    </div> :
-                    <div></div>
-                }
-              </div>
-
-
-              <div className="text-center">
-                <p className="text-white text-[1.25rem] mt-3">
-                  {biddingStatus === 0 && 'None'}
-                  {biddingStatus === 1 && auctionStatus === 1 && 'Pending'}
-                  {
-                    biddingStatus === 1 &&
-                    auctionStatus === 2 &&
-                    auctionWinner &&
-                    'Win'
+                    </div>
                   }
-                  {biddingStatus === 1 &&
-                    auctionStatus === 2 &&
-                    !auctionWinner &&
-                    'Fail'
-                  }
-                </p>
-              </div>
-              {
-                biddingStatus === 1 &&
-                auctionStatus === 2 &&
-                auctionWinner &&
-                <div className="btn-gradient rounded-full p-[1px] mb-3">
-                  <div className="btn-background-absolute rounded-full">
-                    {
-                      <p className={`text-[1.25rem] text-center py-2 px-8 block text-[#15BFFD] m-0
-                        max-w-fit mx-[auto] my-[0]
-                        ${auctionClaimPrized ? 'cursor-no-drop' : 'cursor-pointer'}
-                        `
-                      }
-                        onClick={handleClaimPrize}
-                      >
-                        Claim Prize
-                      </p>
-                    }
-                  </div>
+  
+                  {/* { anchorWallet?.publicKey?.toString() === winnerWalletAddress && biddingStatus === 1 && auctionStatus === 2 && auctionWinner && auctionClaimPrized && <p className="text-white text-[1.25rem] mt-3">
+                    <span style={{ color: "yellow"}}>Winner:</span>&nbsp;&nbsp;
+                    { winnerWalletAddress === '' ? 'No winner': <Link to={`/profile/auction/${winnerWalletAddress}`} style={{ color: "#1a9dfd"}}>{winnerWalletAddress.substr(0, 6)}...{winnerWalletAddress.substr(winnerWalletAddress.length - 4, 4)}</Link>}
+                  </p>} */}
                 </div>
-              }
-
-              {
-                biddingStatus === 1 &&
-                auctionStatus === 2 &&
-                !auctionWinner &&
-                <div className="btn-gradient rounded-full p-[1px] mb-3">
-                  <div className="btn-background-absolute rounded-full">
-                    {
-                      <p className={`text-[1.25rem] text-center py-2 px-8 block text-[#15BFFD] m-0 max-w-fit mx-[auto] my-[0]
-                        ${auctionClaimed ? 'cursor-no-drop' : 'cursor-pointer'}
-                       `}
-                        onClick={handleClaimBid}
-                      >
-                        Claim Bid
-                      </p>
-                    }
-                  </div>
-                </div>
-              }
+              }</>}
             </div>
 
             <div className="basis-[63%]">
@@ -699,7 +801,8 @@ const DetailUserAuction = () => {
                         alt="VerificationIcon"
                         className="w-[20px]"
                       />
-                      <p className="text-white">{nftInfo.tokenName}</p>
+                       &nbsp;
+                      <p className="text-white">{nftInfo.collectionName || `Verified Collection`}</p>
                     </div>
                     <h1 className="text-3xl text-white mt-1">{nftInfo.tokenName}</h1>
 
@@ -728,13 +831,15 @@ const DetailUserAuction = () => {
                   </div>
                   <div>
                     <Link to='/auction' >
-
-                      <div className="flex items-center mb-2">
-                        <img src={ReturnIcon} alt="ReturnIcon" />
-                        <span className="text-white inline-block ml-1">
-                          Return
-                        </span>
-                      </div>
+                      <button
+                          type="button"
+                          className="text-black bg-white rounded-[0.7rem] flex items-center py-3 px-5"
+                        >
+                          <img src={ReturnIcon} alt="ReturnIcon" />
+                          <span className="text-black inline-block ml-1">
+                            Return
+                          </span>
+                        </button>
                     </Link>
                     {/* <div className="flex items-center">
                       <img src={ReportIcon} alt="ReportIcon" />
@@ -749,7 +854,7 @@ const DetailUserAuction = () => {
                   <>
                     <div className="bg-[#323232] py-4 px-4 sm:px-0 mt-4">
                       <div className=" relative sm:flex block justify-between sm:w-[85%] m-auto">
-                        <div className="text-center">
+                        <div className="text-center translate-x-5">
                           <img
                             src={TimingIcon}
                             alt="TimingIcon"
@@ -779,7 +884,7 @@ const DetailUserAuction = () => {
                             className="max-w-[60px] m-auto"
                           />
                           <p className="text-[#878787]">Min. Bid Amount</p>
-                          <p className="text-white">{nftInfo.min_bid_amount}</p>
+                          <p className="text-white">{minBidAmount}</p>
                         </div>
                         <div className="{`
                         md:absolute relative w-[200px] left-[52%] md:translate-x-[63%] translate-x-[0] text-center
@@ -798,7 +903,7 @@ const DetailUserAuction = () => {
                     </div>
                     <div className="bg-[#323232] py-4 px-4 sm:px-0">
                       <div className="relative sm:flex block justify-between sm:w-[80%] m-auto">
-                        <div className="text-center">
+                        <div className="text-center translate-x-5">
                           <img
                             src={TicketIcon}
                             alt="TicketIcon"
@@ -807,13 +912,13 @@ const DetailUserAuction = () => {
                           <p className="text-[#878787]">Floor Price</p>
                           <p className="text-white">{floorPrice}</p>
                         </div>
-                        <div className="text-center translate-x-2.5 ">
+                        <div className="text-center translate-x-5 ">
                           <img
                             src={CurrentBidIcon}
                             alt="TimingIcon"
                             className="max-w-[60px] m-auto"
                           />
-                          <p className="text-[#878787]">Current Bid</p>
+                          <p className="text-[#878787]">My Bid</p>
                           <p className="text-white">{currentBid ? currentBid : 0}</p>
                         </div>
                         {/* <div className="text-center">
@@ -833,6 +938,49 @@ const DetailUserAuction = () => {
                             />
                             <p className="text-[#878787]">Total Bid count</p>
                             <p className="text-white">{totalBidCount}</p>
+                        </div>
+                        <div className="absolute left-[31.9%] md: border-l-[1px] bg-[transparent] w-2 border-dashed h-[108px] border-white  " />
+                        <div className="absolute left-[67%] md: border-l-[1px] bg-[transparent] w-2 border-dashed h-[108px] border-white  " />
+                      </div>
+                    </div>
+                    <div className="bg-[#323232] py-4 px-4 sm:px-0">
+                      <div className="relative sm:flex block justify-between sm:w-[80%] m-auto">
+                        <div className="text-center translate-x-5">
+                           <img
+                            src={CurrentBidIcon}
+                            alt="TimingIcon"
+                            className="max-w-[60px] m-auto"
+                          />
+                          <p className="text-[#878787]">Top Bid</p>
+                          <p className="text-white">{topBidAmount}</p>
+                          
+                        </div>
+                        <div className="text-center translate-x-10 ">
+                          <img
+                              src={TicketIcon}
+                              alt="TicketIcon"
+                              className="max-w-[60px] m-auto"
+                            />
+                            <p className="text-[#878787]">&nbsp;&nbsp;Min. Bid Increment</p>
+                          <p className="text-white">{minBidIncrement}</p>
+                        </div>
+                        {/* <div className="text-center">
+                          <img
+                            src={TimingAuctionIcon}
+                            alt="TimingIcon"
+                            className="max-w-[60px] m-auto"
+                          />
+                          <p className="text-[#878787]">Time Extension</p>
+                          <p className="text-white">5 Minutes</p>
+                        </div> */}
+                        <div className="text-center">
+                          <img
+                              src={BidIcon}
+                              alt="TimingIcon"
+                              className="max-w-[60px] m-auto"
+                            />
+                            <p className="text-[#878787]">End Date</p>
+                            <p className="text-white">{nftInfo.end}</p>
                         </div>
                         <div className="absolute left-[31.9%] md: border-l-[1px] bg-[transparent] w-2 border-dashed h-[108px] border-white  " />
                         <div className="absolute left-[67%] md: border-l-[1px] bg-[transparent] w-2 border-dashed h-[108px] border-white  " />
@@ -858,7 +1006,7 @@ const DetailUserAuction = () => {
                           <ul className="py-2 px-4 w-full flex justify-between" key={idx} >
                             <li className="basis-[50%] text-base">
                             { item?.name ? item?.name : <Link to={`/profile/auction/${item?.bidder.toBase58()}`}>{item?.name ? item?.name : item?.bidder.toBase58()?.substr(0, 6) + '...' + item?.bidder.toBase58()?.substr(item?.bidder.toBase58().length - 4, 4)}</Link> }
-                              { (item.isWinner === 1 || (item.isWinner === 0 && idx === 0 && biddingStatus === 1 && auctionStatus === 2 && auctionWinner ) ) && <span style={{ color: "yellow"}}>&nbsp;&nbsp;&nbsp;Winner</span>}
+                              { (item.isWinner === 1 || (item.isWinner === 0 && idx === 0 && biddingStatus === 1 && auctionStatus === 2 ) ) && <span style={{ color: "yellow"}}>&nbsp;&nbsp;&nbsp;Winner</span>}
                             </li>
                             <li className="basis-[50%] text-base text-center">{Number(item?.price) / CONFIG.DECIMAL}</li>
                           </ul>
@@ -869,11 +1017,11 @@ const DetailUserAuction = () => {
                 )}
                 <div className="p-4">
                   <h1 className="text-2xl text-white">Terms & Conditions</h1>
-                  <ul className="text-white mt-2 text-base list-decimal px-5">
-                    <li>
+                  <div className="text-white mt-2 text-base list-decimal px-5">
+                    <pre>
                       {nftInfo.description}
-                    </li>
-                  </ul>
+                    </pre>
+                  </div>
                 </div>
               </div>
             </div>

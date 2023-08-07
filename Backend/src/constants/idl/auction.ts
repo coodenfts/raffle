@@ -69,6 +69,10 @@ export type Auction = {
           "type": "u64"
         },
         {
+          "name": "bidIncrement",
+          "type": "u64"
+        },
+        {
           "name": "minNftCount",
           "type": "u32"
         }
@@ -102,9 +106,13 @@ export type Auction = {
           "type": "u64"
         },
         {
+          "name": "bidIncrement",
+          "type": "u64"
+        },
+        {
           "name": "minNftCount",
           "type": "u32"
-        },
+        }
       ]
     },
     {
@@ -229,7 +237,7 @@ export type Auction = {
         {
           "name": "pool",
           "isMut": true,
-          "isSigner": false
+         "isSigner": false
         },
         {
           "name": "payMint",
@@ -277,7 +285,7 @@ export type Auction = {
           "type": "u32"
         }
       ]
-    },
+   },
     {
       "name": "cancelBid",
       "accounts": [
@@ -384,6 +392,11 @@ export type Auction = {
       "name": "claimPrize",
       "accounts": [
         {
+          "name": "admin",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "bidder",
           "isMut": true,
           "isSigner": true
@@ -405,6 +418,21 @@ export type Auction = {
         },
         {
           "name": "ataTo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "payMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenFrom",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenTo",
           "isMut": true,
           "isSigner": false
         },
@@ -486,6 +514,78 @@ export type Auction = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "sendBackFt",
+      "accounts": [
+        {
+          "name": "partner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "bidder",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "payMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "ataFrom",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "ataTo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "setWinner",
+      "accounts": [
+        {
+          "name": "partner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [
@@ -512,6 +612,10 @@ export type Auction = {
           },
           {
             "name": "minPrice",
+            "type": "u64"
+          },
+          {
+            "name": "bidIncrement",
             "type": "u64"
           },
           {
@@ -565,7 +669,7 @@ export type Auction = {
           }
         ]
       }
-    }
+   }
   ],
   "errors": [
     {
@@ -613,7 +717,7 @@ export type Auction = {
       "name": "ClaimBidError",
       "msg": "Error in claim bid"
     },
-    {
+   {
       "code": 6009,
       "name": "AlreadyClaimed",
       "msg": "Already claimed"
@@ -651,15 +755,25 @@ export type Auction = {
     {
       "code": 6016,
       "name": "AlreadySendBack",
-      "msg": "Already send back NFT"
+      "msg": "Already send back nft"
     },
     {
       "code": 6017,
       "name": "AlreadySetWinner",
       "msg": "Already setted winner"
+    },
+    {
+      "code": 6018,
+      "name": "GetPriceError",
+      "msg": "Price isn't correct"
+    },
+    {
+      "code": 6019,
+      "name": "NotClaimedPrize",
+      "msg": "Not claimed prize"
     }
   ]
-};
+}
 
 export const IDL: Auction = {
   "version": "0.1.0",
@@ -732,6 +846,10 @@ export const IDL: Auction = {
           "type": "u64"
         },
         {
+          "name": "bidIncrement",
+          "type": "u64"
+        },
+        {
           "name": "minNftCount",
           "type": "u32"
         }
@@ -765,9 +883,13 @@ export const IDL: Auction = {
           "type": "u64"
         },
         {
+          "name": "bidIncrement",
+          "type": "u64"
+        },
+        {
           "name": "minNftCount",
           "type": "u32"
-        },
+        }
       ]
     },
     {
@@ -892,7 +1014,7 @@ export const IDL: Auction = {
         {
           "name": "pool",
           "isMut": true,
-          "isSigner": false
+         "isSigner": false
         },
         {
           "name": "payMint",
@@ -940,7 +1062,7 @@ export const IDL: Auction = {
           "type": "u32"
         }
       ]
-    },
+   },
     {
       "name": "cancelBid",
       "accounts": [
@@ -1047,6 +1169,11 @@ export const IDL: Auction = {
       "name": "claimPrize",
       "accounts": [
         {
+          "name": "admin",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "bidder",
           "isMut": true,
           "isSigner": true
@@ -1068,6 +1195,21 @@ export const IDL: Auction = {
         },
         {
           "name": "ataTo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "payMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenFrom",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenTo",
           "isMut": true,
           "isSigner": false
         },
@@ -1149,6 +1291,78 @@ export const IDL: Auction = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "sendBackFt",
+      "accounts": [
+        {
+          "name": "partner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "bidder",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "payMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "ataFrom",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "ataTo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "setWinner",
+      "accounts": [
+        {
+          "name": "partner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [
@@ -1175,6 +1389,10 @@ export const IDL: Auction = {
           },
           {
             "name": "minPrice",
+            "type": "u64"
+          },
+          {
+            "name": "bidIncrement",
             "type": "u64"
           },
           {
@@ -1228,7 +1446,7 @@ export const IDL: Auction = {
           }
         ]
       }
-    }
+   }
   ],
   "errors": [
     {
@@ -1276,7 +1494,7 @@ export const IDL: Auction = {
       "name": "ClaimBidError",
       "msg": "Error in claim bid"
     },
-    {
+   {
       "code": 6009,
       "name": "AlreadyClaimed",
       "msg": "Already claimed"
@@ -1314,12 +1532,22 @@ export const IDL: Auction = {
     {
       "code": 6016,
       "name": "AlreadySendBack",
-      "msg": "Already send back NFT"
+      "msg": "Already send back nft"
     },
     {
       "code": 6017,
       "name": "AlreadySetWinner",
       "msg": "Already setted winner"
+    },
+    {
+      "code": 6018,
+      "name": "GetPriceError",
+      "msg": "Price isn't correct"
+    },
+    {
+      "code": 6019,
+      "name": "NotClaimedPrize",
+      "msg": "Not claimed prize"
     }
   ]
-};
+}

@@ -20,6 +20,8 @@ const AuctionRarticipant = (props: any) => {
     get_count.push(filter_item[i].price.toNumber())
   }
 
+  const winner = item.bids.find((item: any) => item.isWinner === 1)
+
   const highest = Math.max.apply(Math, get_count) / LAMPORTS_PER_SOL
 
   let startCountdownApi: CountdownApi | null = null
@@ -80,10 +82,12 @@ const AuctionRarticipant = (props: any) => {
     )
   }
 
+  console.log('winnerWalletAddress', item.winnerWalletAddress)
+
   return (
     <div key={idx} >
       <div className="max-w-[1280px] m-auto px-4">
-        <div className="border-2 border-white bg-[#606060A6] rounded-md mb-4">
+        <div className={`border-2 border-[${item.winnerWalletAddress ? 'orange' : 'white'}] bg-[#606060A6] rounded-md mb-4`}>
           <div className="flex p-4">
             <div className="flex basis-[30%]">
               <div className="mr-2">

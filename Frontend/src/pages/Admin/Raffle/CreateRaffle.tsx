@@ -39,6 +39,8 @@ const CreateRaffle = () => {
     start_date: new Date(),
     end_date: new Date(),
     mint: ``,
+    symbol: ``,
+    collectionName: ``,
     tokenId: 0,
     tokenName: ``
   });
@@ -57,7 +59,9 @@ const CreateRaffle = () => {
       payload.append("project", 'Yogesh');
       payload.append("description", raffleValue.description);
       payload.append("image", raffleValue.image);
-      payload.append("tokenId", "1");
+      payload.append("symbol", raffleValue.symbol);
+      payload.append("collectionName", raffleValue.collectionName);
+      payload.append("tokenId", raffleValue.tokenId);
       payload.append("tokenName", raffleValue.tokenName);
       payload.append("discord", raffleValue.discord);
       payload.append("twitter", raffleValue.twitter);

@@ -1,5 +1,6 @@
 import { getParsedNftAccountsByOwner } from "@nfteyez/sol-rayz";
 import { useEffect, useState } from "react";
+import axios from "axios";
 import { getNftMetadata } from "../../utils";
 import "./index.css";
 import VerificationIcon from "../../assets/Verification-icon-2.png";
@@ -30,6 +31,7 @@ const NFTModal = (props: any) => {
               return meta;
             })
           );
+          console.log('metadataList', metadataList)
           setNfts(
             lists.map((item, index) => ({
               ...item,
@@ -46,10 +48,18 @@ const NFTModal = (props: any) => {
     })();
   }, [show]);
 
-  const onOkBtn = () => {
+  const onOkBtn = async () => {
     if (raffleValue) {
+      const uri = selectedNft?.data?.uri || ``;
+      if(uri !== "") {
+        const metadata = (await axios.get(uri)).data
+        console.log('metadata', metadata)
+      }
+
       setRaffleValue({
         ...raffleValue,
+        symbol: selectedNft?.data?.symbol || ``,
+        collectionName: selectedNft?.collection?.name || ``,
         mint: selectedNft?.mint,
         image: selectedNft?.image ? selectedNft?.image : ``,
         tokenName: selectedNft?.name ? selectedNft?.name : ``,
@@ -60,6 +70,8 @@ const NFTModal = (props: any) => {
     if (auctionValue) {
       setAuctionValue({
         ...auctionValue,
+        symbol: selectedNft?.data?.symbol || ``,
+        collectionName: selectedNft?.collection?.name || ``,
         mint: selectedNft?.mint,
         image: selectedNft?.image,
         tokenName: selectedNft?.name ? selectedNft?.name : ``,
@@ -70,7 +82,7 @@ const NFTModal = (props: any) => {
     props.onCancel()
   }
 
-  console.log("selectedNft.mint", selectedNft?.mint)
+  console.log("selectedNft", selectedNft)
   const handleSelect = (index: number) => {
     try {
       if (isModalLoading) return;

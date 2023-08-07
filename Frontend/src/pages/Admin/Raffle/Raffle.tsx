@@ -36,6 +36,8 @@ const AdminRaffle = () => {
   })
   const [isFilterByItem, setFilterByItem] = useState([...raffleData])
   const [searchNft, setSearchNft] = useState(``)
+  const [menuIndex, setMenuIndex] = useState(0)
+  const currentTime = Math.floor(Date.now() / 1000);
 
   const handleFeatured = () => {
     setFeatured(true);
@@ -56,10 +58,10 @@ const AdminRaffle = () => {
     setFilterRaffles(false);
   };
   const handleFilterRaffles = () => {
-    setFeatured(false);
-    setAllRaffles(false);
-    setPastRaffles(false);
-    setFilterRaffles(true);
+    // setFeatured(false);
+    // setAllRaffles(false);
+    // setPastRaffles(false);
+    setFilterRaffles(!isFilterRaffles);
   };
 
   const handleSearchNft = (input: any) => {
@@ -69,23 +71,49 @@ const AdminRaffle = () => {
     setFilterByItem(filtered_name)
   }
 
-  const handleExpiringSoonSort = () => {
-    const res = raffleData.sort((a: any, b: any) => a.end_date - b.end_date)
+  const handleRecentlyAdded = () => {
+    const res = raffleData.sort((a: any, b: any) => b?.id - a?.id)
     setFilterByItem([...res])
+    setMenuIndex(0)
   }
 
-  const handleSellingOutSoonSort = () => {
-    const res = raffleData.sort((a: any, b: any) => a.count - b.count)
+  const handleExpiringSoonSort = () => {
+    // isFilterByItem
+    const res = raffleData.sort((a: any, b: any) => a.end_date - b.end_date).filter((item: any) => currentTime > item.start_date && currentTime < item.end_date)
     setFilterByItem([...res])
+    setMenuIndex(1)
+  }
+
+  
+  const handleSellingOutSoonSort = () => {
+    // isFilterByItem
+    const res = raffleData.sort((a: any, b: any) => a.count - b.count).filter((item: any) => currentTime > item.start_date && currentTime < item.end_date)
+    setFilterByItem([...res])
+    setMenuIndex(2)
   }
 
   const handlePriceAscendingSort = () => {
-    const res = isFilterByItem.sort((a: any, b: any) => a.price - b.price)
+    const res = raffleData.sort((a: any, b: any) => a.price - b.price)
     setFilterByItem([...res])
+    setMenuIndex(3)
   }
+
   const handlePriceDescendingSort = () => {
-    const res = isFilterByItem.sort((a: any, b: any) => b.price - a.price)
+    const res = raffleData.sort((a: any, b: any) => b.price - a.price)
     setFilterByItem([...res])
+    setMenuIndex(4)
+  }
+
+  const handleFloorAscendingSort = () => {
+    const res = raffleData.sort((a: any, b: any) => a.floor_price - b.floor_price)
+    setFilterByItem([...res])
+    setMenuIndex(5)
+  }
+
+  const handleFloorDescendingSort = () => {
+    const res = raffleData.sort((a: any, b: any) => b.floor_price - a.floor_price)
+    setFilterByItem([...res])
+    setMenuIndex(6)
   }
 
   const handleFilterApplyBtn = () => {
@@ -147,10 +175,24 @@ const AdminRaffle = () => {
         const exist_pool = await connection.getAccountInfo(pool);
         if (exist_pool) {
           const poolData: any = await program.account.pool.fetch(pool);
+
+          const buyer = poolData?.buyers.find((item: any) => {
+            return item.buyer.toString() === anchorWallet?.publicKey?.toString();
+          });
+
+          const winnerInfo = poolData?.buyers.find((item: any) => item.purchasedTicket >0 && item.isWinner === 1)
+          let winnerWalletAddress = ''
+          if(winnerInfo){
+            winnerWalletAddress = winnerInfo.buyer.toString()
+          }
+
           const res = {
             ...getRaffle[i],
             count: poolData.count,
             purchasedTicket: poolData.purchasedTicket ? poolData?.purchasedTicket : 0,
+            myTicket: buyer ? buyer.purchasedTicket: 0,
+            winnerWalletAddress,
+            endTime: poolData.endTime
           };
           final_raffle_All.push(res)
         } else {
@@ -159,8 +201,8 @@ const AdminRaffle = () => {
         }
 
       }
-      setFilterByItem([...final_raffle_All])
-      setRaffleData([...final_raffle_All]);
+      setFilterByItem([...final_raffle_All].sort((a: any, b: any) => b?.id - a?.id))
+      setRaffleData([...final_raffle_All].sort((a: any, b: any) => b?.id - a?.id));
 
       const featuredData = final_raffle_All.filter(
         (item: any) => item.end_date >= Date.now() / 1000 && Date.now() / 1000 >= item.start_date
@@ -169,8 +211,8 @@ const AdminRaffle = () => {
         (item: any) => item.end_date < Date.now() / 1000
       );
 
-      setFeaturedData(featuredData);
-      setPastData(pastData);
+      setFeaturedData(featuredData.sort((a: any, b: any) => b?.id - a?.id));
+      setPastData(pastData.sort((a: any, b: any) => b?.id - a?.id));
 
     } catch (error) {
     }
@@ -214,6 +256,20 @@ const AdminRaffle = () => {
               </svg>
               <span className="inline-block ml-2 text-base">Filter</span>
             </button>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search"
+                className=" text-[#fff] placeholder:text-[#9B9B9B] bg-[#46464680] text-base p-3 rounded-[0.6rem] border border-[#606060] outline-none text-[#9B9B9B]"
+                value={searchNft}
+                onChange={(e) => handleSearchNft(e.target.value)}
+              />
+              <img
+                src={searchIcon}
+                alt="searchIcon"
+                className="absolute top-[12px] right-[10px] w-[26px]"
+              />
+            </div>
             <div className="flex items-center justify-between xl:basis-[35%] sm:w-[400px] sm:my-4 lg:my-0">
               <button
                 type="button"
@@ -246,23 +302,6 @@ const AdminRaffle = () => {
                 Past Raffles
               </button>
             </div>
-            {
-              isFilterRaffles &&
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search"
-                  className=" text-[#fff] placeholder:text-[#9B9B9B] bg-[#46464680] text-base p-3 rounded-[0.6rem] border border-[#606060] outline-none text-[#9B9B9B]"
-                  value={searchNft}
-                  onChange={(e) => handleSearchNft(e.target.value)}
-                />
-                <img
-                  src={searchIcon}
-                  alt="searchIcon"
-                  className="absolute top-[12px] right-[10px] w-[26px]"
-                />
-              </div>
-            }
           </div>
           {/* Filter Raffle Tab  */}
           {isFilterRaffles && (
@@ -278,54 +317,63 @@ const AdminRaffle = () => {
                       <div className="basis-[22%]">
                         <div className="border-4 border-[#606060] bg-white p-4 mt-6 rounded-[0.6rem]">
                           <h1 className="text-3xl">Sort</h1>
-                          <p className="text-lg ml-1">Recently Added</p>
                           <ul className="ml-1">
-                            <li className="my-2">
-                              <p
-                                onClick={handleExpiringSoonSort}
-                                className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
-                              >
-                                Expiring Soon
-                              </p>
-                            </li>
-                            <li className="my-2">
-                              <p
-                                onClick={handleSellingOutSoonSort}
-                                className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
-                              >
-                                Selling Out Soon
-                              </p>
-                            </li>
-                            <li className="my-2">
-                              <p
-                                onClick={handlePriceAscendingSort}
-                                className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
-                              >
-                                Price (Ascending)
-                              </p>
-                            </li>
-                            <li className="my-2">
-                              <p
-                                onClick={handlePriceDescendingSort}
-                                className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
-                              >
-                                Price (Descending)
-                              </p>
-                            </li>
-                            <li className="my-2">
-                              <p
-                                className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
-                              >
-                                Floor (Ascending)
-                              </p>
-                            </li>
-                            <li className="my-2">
-                              <p
-                                className="cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all"
-                              >
-                                Floor (Descending)
-                              </p>
-                            </li>
+                          <li className="my-2">
+                            <p
+                              onClick={handleRecentlyAdded}
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 0 && "font-bold"}`}
+                            >
+                              Recently Added
+                            </p>
+                          </li>
+                          <li className="my-2">
+                            <p
+                              onClick={handleExpiringSoonSort}
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 1 && "font-bold"}`}
+                            >
+                              Expiring Soon
+                            </p>
+                          </li>
+                          <li className="my-2">
+                            <p
+                              onClick={handleSellingOutSoonSort}
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 2 && "font-bold"}`}
+                            >
+                              Selling Out Soon
+                            </p>
+                          </li>
+                          <li className="my-2">
+                            <p
+                              onClick={handlePriceAscendingSort}
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 3 && "font-bold"}`}
+                            >
+                              Ticket Price (Ascending)
+                            </p>
+                          </li>
+                          <li className="my-2">
+                            <p
+                              onClick={handlePriceDescendingSort}
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 4 && "font-bold"}`}
+                            >
+                              Ticket Price (Descending)
+                            </p>
+                          </li>
+                          <li className="my-2">
+                            <p
+                              onClick={handleFloorAscendingSort}
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 5 && "font-bold"}`}
+                            >
+                              Floor (Ascending)
+                            </p>
+                          </li>
+                          <li className="my-2">
+                            <p
+                              onClick={handleFloorDescendingSort}
+                              className={`cursor-pointer text-[#5E5E5E] text-base hover:text-black transition-all ${menuIndex === 6 && "font-bold"}`}
+                            >
+                              Floor (Descending)
+                            </p>
+                          </li>
                           </ul>
                           <div className="mt-4">
                             <h1 className="text-3xl">Filter</h1>

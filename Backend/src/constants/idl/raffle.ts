@@ -179,6 +179,11 @@ export type Raffle = {
           "isSigner": true
         },
         {
+          "name": "admin",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "pool",
           "isMut": true,
           "isSigner": false
@@ -318,6 +323,57 @@ export type Raffle = {
       "args": []
     },
     {
+      "name": "claimCoode",
+      "accounts": [
+        {
+          "name": "admin",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "payMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "ataFrom",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "ataTo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "sendBackNft",
       "accounts": [
         {
@@ -372,8 +428,7 @@ export type Raffle = {
         }
       ],
       "args": []
-    },
-    
+    }
   ],
   "accounts": [
     {
@@ -429,7 +484,7 @@ export type Raffle = {
             "type": "u32"
           },
           {
-            "name": "mintNftCount",
+            "name": "minNftCount",
             "type": "u32"
           }
         ]
@@ -523,9 +578,9 @@ export type Raffle = {
       "code": 6012,
       "name": "SendBackNftError",
       "msg": "Error in send back nft"
-    },
+    }
   ]
-};
+}
 
 export const IDL: Raffle = {
   "version": "0.1.0",
@@ -708,6 +763,11 @@ export const IDL: Raffle = {
           "isSigner": true
         },
         {
+          "name": "admin",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "pool",
           "isMut": true,
           "isSigner": false
@@ -847,6 +907,57 @@ export const IDL: Raffle = {
       "args": []
     },
     {
+      "name": "claimCoode",
+      "accounts": [
+        {
+          "name": "admin",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "payMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "ataFrom",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "ataTo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "sendBackNft",
       "accounts": [
         {
@@ -901,8 +1012,7 @@ export const IDL: Raffle = {
         }
       ],
       "args": []
-    },
-    
+    }
   ],
   "accounts": [
     {
@@ -958,7 +1068,7 @@ export const IDL: Raffle = {
             "type": "u32"
           },
           {
-            "name": "mintNftCount",
+            "name": "minNftCount",
             "type": "u32"
           }
         ]
@@ -1052,6 +1162,6 @@ export const IDL: Raffle = {
       "code": 6012,
       "name": "SendBackNftError",
       "msg": "Error in send back nft"
-    },
+    }
   ]
-};
+}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, startTransition } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as anchor from "@project-serum/anchor";
 import { PublicKey, Commitment, ConnectionConfig, LAMPORTS_PER_SOL, Message } from '@solana/web3.js';
@@ -67,22 +67,38 @@ const RaffleProfile = () => {
           program.programId
         );
         const poolData: any = await program.account.pool.fetch(pool);
+        const winner = poolData.buyers.find((item: any) => item.isWinner === 1 && item.buyer.toString() === walletAddress)
+        console.log('winner', winner)
         const findMeINPoolData = poolData.buyers.find((item: any) =>
           // item?.buyer?.toString() === anchorWallet?.publicKey?.toString()
           item?.buyer?.toString() === walletAddress
         )
-        const getMetadata = await getNftMetaDataByMint(getRaffle[i].mint)
+
         if (findMeINPoolData) {
-          get_filterField.push({
+          let filter_item = {
+            ...getRaffle[i],
             ...poolData,
-            id: raffleParam,
-            image: getMetadata?.image,
-            name: getMetadata?.data?.name,
-            tokenName: getMetadata?.data?.name.split('#')[0],
-            tokenId: getMetadata?.data?.name.split('#')[1]
-          })
+            id: raffleParam
+          }
+
+          if(winner)
+            filter_item = {...filter_item,  winnerWalletAddress: walletAddress}
+
+          // const getMetadata = await getNftMetaDataByMint(getRaffle[i].mint)
+          // console.log("Object.keys(getMetadata).length", Object.keys(getMetadata).length)
+          // if(Object.keys(getMetadata).length > 0) {
+          //   filter_item = {
+          //     ...filter_item,
+          //     image: getMetadata?.image || ``,
+          //     name: getMetadata?.data?.name || ``,
+          //     tokenName: getMetadata?.data?.name.split('#')[0] || ``,
+          //     tokenId: getMetadata?.data?.name.split('#')[1] || ``,
+          //   }
+          // }
+          get_filterField.push({...filter_item})
         }
       }
+      console.log('get_filterField=================', get_filterField)
       setParticipantLists(get_filterField)
     } catch (error) {
       console.log('error', error)
@@ -193,7 +209,7 @@ const RaffleProfile = () => {
       await getData();
       setLoading(false);
     })();
-  }, [anchorWallet]);
+  }, [anchorWallet, walletAddress]);
 
   useEffect(() => {
     (async () => {
@@ -285,7 +301,7 @@ const RaffleProfile = () => {
               <div className="bg-white rounded-md py-8 px-8 flex items-center">
                 <img src={infoIconBlack} alt="infoIconBlack" />
                 <h1 className="xl:text-[3.2rem] lg:text-[2.5rem] md:text-[1.8rem] ml-10">
-                  { anchorWallet?.publicKey.toString() === walletAddress ? "You havn’t participated in any Raffles!" : "This wallet hasn’t participated in any Raffles!" }
+                  { anchorWallet ? (anchorWallet?.publicKey.toString() === walletAddress ? "You havn’t participated in any Raffles!" : "This wallet hasn’t participated in any Raffles!") : "Please login with your wallet!"}
                   
                 </h1>
               </div>

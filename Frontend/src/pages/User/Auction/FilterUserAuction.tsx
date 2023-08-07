@@ -28,6 +28,7 @@ const FilterUserAuction = (props: any) => {
   const [biddingStatus, setBiddingStatus] = useState(0);
   const [amount, setAmount] = useState(0);
   const [currentBid, setCurrentBid] = useState(0)
+  const currentTime = Math.floor(Date.now() / 1000);
 
   let startCountdownApi: CountdownApi | null = null
   let endCountdownApi: CountdownApi | null = null
@@ -119,18 +120,18 @@ const FilterUserAuction = (props: any) => {
         ownNfts.lists.length
       );
       if (createRes) {
-        toast("Success on creating bid");
+        toast.success("Success on creating bid");
         setBiddingStatus(1);
         setCurrentBid(amount)
 
       } else {
-        toast("Fail on creating bid");
+        toast.error("Fail on creating bid");
       }
       setLoading(false)
 
     } catch (error) {
       console.log('error', error)
-      toast("Fail on creating bid");
+      toast.error("Fail on creating bid");
 
       setLoading(false)
 
@@ -200,8 +201,8 @@ const FilterUserAuction = (props: any) => {
           <div id="preloader"></div> :
           <div id="preloader" style={{ display: "none" }}></div>
       }
-      <div
-        className={`lg:basis-[32%] md:basis-[48%] sm:basis-[48%] basis-[100%] mt-6`}
+       <div
+        className="xl:basis-[32%] lg:basis-[48%] md:basis-[48%] sm:basis-[48%] basis-[100%] mt-6"
         key={item._id}
       >
 
@@ -215,26 +216,22 @@ const FilterUserAuction = (props: any) => {
             <div className="absolute top-0 left-0 h-full w-full">
               <div className="flex flex-col justify-between h-full p-2">
                 <div className="flex justify-end">
-                  <div className="border-black bg-[#949494] border flex rounded-md overflow-hidden">
+                  {/* <div className="border-black bg-[#949494] border flex rounded-md overflow-hidden">
                     <p className="bg-white text-base py-1 pl-2 pr-4 para-clip">
                       {item.tokenName}
                     </p>
-                    <p className="py-1 px-2 text-base text-white">#{item.tokenId}</p>
-                  </div>
+                    <p className="py-1 px-2 text-base text-white">#{item.tokenId || 1}</p>
+                  </div> */}
                 </div>
                 <div className="flex justify-between items-start">
-                  {/* <div className="border-black bg-[#949494] border flex rounded-md overflow-hidden">
-                    <p className="bg-white text-base pt-[4px] pl-2 pr-3 para-clip-2">
-                      <img
-                        src={UnionIcons}
-                        alt="UnionIcons"
-                        className="w-[10px]"
-                      />
+                  <div className="border-black bg-[#949494] border flex rounded-md overflow-hidden">
+                    <p className="bg-white text-[12px] pt-[2px] pl-2 pr-3 para-clip-3">
+                      Floor
                     </p>
                     <p className="py-[2px] pl-[2px] pr-[5px] text-[12px] text-white">
-                      #0001
+                      {item.floor_price || '_'}
                     </p>
-                  </div> */}
+                  </div>
                   <div className="border-black bg-[#949494] border flex rounded-md overflow-hidden">
                     <p className="bg-white text-[12px] pt-[2px] pl-2 pr-3 para-clip-3">
                       Min NFT Count
@@ -252,7 +249,7 @@ const FilterUserAuction = (props: any) => {
               <div className="flex items-center">
                 <img src={VerificationIcon} alt="VerificationIcon" />
                 <span className="text-base leading-none inline-block ml-1">
-                  {item.tokenName}
+                  {item.collectionName || `Verified Collection`}
                 </span>
               </div>
               <h1 className="text-xl">{item.tokenName}</h1>
@@ -260,8 +257,8 @@ const FilterUserAuction = (props: any) => {
             <div className="pt-2 pl-3 pr-2">
               <div className="flex justify-between">
                 <div className="basis-[49%]">
-                  <p className="text-sm">Time Remaining</p>
-                  <p className="text-sm text-[#4A4A4A]">
+                  <p className="text-sm font-bold">Time Remaining</p>
+                  <div className="text-sm text-[#4A4A4A]">
                     <Countdown
                       ref={setStartCountdownRef}
                       date={item.start_date * 1000}
@@ -269,25 +266,39 @@ const FilterUserAuction = (props: any) => {
 
                       renderer={startCountdownRenderer}
                     />
-                  </p>
+                  </div>
                 </div>
                 <div className="basis-[49%]">
                   <p className="text-sm">Min. Bid Amount</p>
-                  <p className="text-sm text-[#4A4A4A]">{item.min_bid_amount}</p>
+                  <p className="text-sm text-[#4A4A4A] font-bold">{item.min_bid_amount} $COODE</p>
                 </div>
               </div>
-              <div className="flex justify-between pt-2 pb-9">
+              <div className="flex justify-between pt-2">
                 <div className="basis-[50%]">
-                  <p className="text-sm">Current Bid</p>
-                  <p className="text-sm text-[#4A4A4A]">{currentBid}</p>
+                  <p className="text-sm">My Bid</p>
+                  <p className="text-sm text-[#4A4A4A] font-bold">{currentBid} $COODE</p>
                 </div>
-                {
+                <div className="basis-[50%]">
+                  <p className="text-sm">Top Bid</p>
+                  <p className="text-sm text-[#4A4A4A] font-bold">{item.topBidAmount} $COODE</p>
+                </div>
+
+              </div>
+              <div className="flex justify-between pt-2 pb-9">
+              {/* <div className="basis-[49%]">
+                <p className="text-sm">Floor Price</p>
+                <p className="text-sm text-[#4A4A4A] font-bold">
+                  {item.floor_price + ' SOL' || `_`}
+                </p>
+              </div> */}
+              {
                   Date.now() / 1000 < item.end_date && <div className="flex basis-[50%] justify-between items-start">
                     <input
                       type="number"
-                      placeholder="QTY"
+                      placeholder="0"
                       className={`${biddingStatus === 1 ? `opacity-70 cursor-no-drop ` : ``}  w-[49%] text-center outline-none text-sm border border-black bg-[#82828240] text-[#000] py-1 rounded-md`}
                       value={amount}
+                      min={0}
                       disabled={biddingStatus === 1 ? true : false}
                       onChange={(e: any) => {
                         if (biddingStatus === 1) {
@@ -308,20 +319,32 @@ const FilterUserAuction = (props: any) => {
                     </button>
                   </div>
                 }
-
               </div>
             </div>
           </div>
         </div>
         <div className="-mt-[26px] text-center">
-          <Link
-            to={`/auction/${item._id}`}
-            className="bg-black text-white border-4 rounded-md inline-block py-2 px-6  border-[#606060]"
-          >
-            View Auction
-          </Link>
-        </div>
-        <ToastContainer />
+        { currentTime > item.endTime ? <Link
+          to={`/auction/${item._id}`}
+          style={{ fontWeight: "bold"}}
+          className={`
+                      ${ item.winnerWalletAddress !== `` && item.winnerWalletAddress === anchorWallet?.publicKey.toString() && `bg-black text-[orange] border-[orange]`}
+                      ${ item.winnerWalletAddress !== `` && item.winnerWalletAddress !== anchorWallet?.publicKey.toString() && `bg-black text-[grey] border-[grey]`}
+                      ${ item.winnerWalletAddress === `` && `bg-black text-[red] border-[red]`}
+                      border-4 rounded-md inline-block py-2 px-6    
+                    `}
+        >
+          View Auction
+        </Link> : <Link
+          to={`/auction/${item._id}`}
+          style={{ fontWeight: "bold"}}
+          className="border-4 rounded-md inline-block py-2 px-6 bg-black text-[white] border-[#606060]"
+        >
+          View Auction
+        </Link> }
+        
+      </div>
+      <ToastContainer />
 
       </div>
     </>
