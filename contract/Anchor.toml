@@ -1,0 +1,16 @@
+[features]
+seeds = false
+skip-lint = false
+[programs.mainnet]
+raffle = "5yCc6fGQwcKSyDKADVKXLAQYB4mDTZiHNZVXjvQqVXgB"
+auction = "AHXFqPbBRnxPcNStkzQumQBfUV5L7vN1EL3i3jpKzpWn"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "https://api.mainnet-beta.solana.com"
+wallet = "/home/admin-wallet.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
